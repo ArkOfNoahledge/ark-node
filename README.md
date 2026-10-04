@@ -1,11 +1,22 @@
-# Ark node
+# Ark of Noahledge node
 
-**An offline answer engine for a Windows PC with an NVIDIA card.** Ask it a
-question and it answers from a library on your own disk, and every claim in the
-answer links to the page it came from. No account, no cloud, no network once it
-is set up.
+**Off-grid AI that brings grounded knowledge to the places that need it most.**
+Where the grid is unreliable and the internet is not a given, the Ark of
+Noahledge puts an open-weight AI beside a library of humanity's practical
+knowledge (medicine, clean water, engineering, agriculture, repair) on one
+computer that needs no connection to work. Every answer is grounded in that
+library and cites the page it came from, so the person asking can read the
+source before acting on it. Knowledge should not depend on a cable or a
+subscription.
 
-[Leer en español](README.es.md) · [arkofnoahledge.org](https://arkofnoahledge.org)
+This repository is the software that runs it: the answer engine, the tools that
+download and verify the library, and a starter kit that turns a Windows PC with
+an NVIDIA card into a working node in about an hour. No account and no cloud:
+once it is set up, nothing leaves the machine. The vision, the solar-powered
+hardware design and the full catalog are at
+**[arkofnoahledge.org](https://arkofnoahledge.org)**.
+
+[Leer en español](README.es.md)
 
 ![Every citation opens the page it came from: Nuclear War Survival Skills, page 116, in Kiwix, on the same machine](docs/images/source.webp)
 

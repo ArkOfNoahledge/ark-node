@@ -1,11 +1,22 @@
-# Ark node
+# Nodo del Arca del Conocimiento
 
-**Un motor de respuestas sin conexión para un PC con Windows y tarjeta NVIDIA.**
-Le haces una pregunta y responde desde una biblioteca guardada en tu propio
-disco, y cada afirmación de la respuesta enlaza con la página de donde salió. Sin
-cuenta, sin nube y sin red una vez instalado.
+**IA fuera de la red que lleva conocimiento verificable a los lugares que más lo
+necesitan.** Donde la electricidad falla y el internet no está garantizado, el
+Arca del Conocimiento pone una IA de pesos abiertos junto a una biblioteca del
+conocimiento práctico de la humanidad (medicina, agua potable, ingeniería,
+agricultura, reparación) en una sola computadora que no necesita conexión para
+funcionar. Cada respuesta se basa en esa biblioteca y cita la página de donde
+salió, para que quien pregunta pueda leer la fuente antes de actuar. El
+conocimiento no debería depender de un cable ni de una suscripción.
 
-[Read in English](README.md) · [arkofnoahledge.org](https://arkofnoahledge.org/es/)
+Este repositorio es el software que la hace funcionar: el motor de respuestas,
+las herramientas que descargan y verifican la biblioteca, y un kit inicial que
+convierte un PC con Windows y una tarjeta NVIDIA en un nodo funcionando en cerca
+de una hora. Sin cuenta y sin nube: una vez instalado, nada sale de la máquina.
+La visión, el diseño del equipo alimentado por sol y el catálogo completo están
+en **[arkofnoahledge.org](https://arkofnoahledge.org/es/)**.
+
+[Read in English](README.md)
 
 ![Cada cita abre la página de donde salió: Nuclear War Survival Skills, página 116, en Kiwix, en la misma máquina](docs/images/source.webp)
 
