@@ -873,6 +873,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         sys.stderr.write("  %s %s\n" % (self.address_string(), fmt % a))
 
     def _send(self, code, body, ctype="application/json; charset=utf-8", extra=None):
+        ctype = _header_value(ctype)
         if isinstance(body, (dict, list)):
             body = json.dumps(body, ensure_ascii=False, indent=1).encode("utf-8")
         elif isinstance(body, str):
@@ -1130,7 +1131,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._send(500, {"error": "%s: %s" % (type(e).__name__, e)})
 
     def _file(self, full, retile_port=None):
-        if not os.path.isfile(full):
+        # ONE CONTAINMENT CHECK FOR EVERY FILE THIS SERVER SENDS (2026-10-04).
+        # Each route already confined its own path (/files/ by store.file_path,
+        # /web/ by basename, /map/ by normpath against MAPDIR), but three checks
+        # in three places is three chances to forget one; CodeQL's first scan of
+        # the public repository could not see them from here, and neither could a
+        # reader. Resolved, then required to sit inside a root this node serves.
+        full = _contained(full)
+        if full is None or not os.path.isfile(full):
             return self._send(404, {"error": "missing file"})
         ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
         if ctype.startswith("text/") or ctype in ("application/javascript",):
@@ -1140,7 +1148,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._send(200, retile(fh.read(), retile_port), ctype=ctype)
         size = os.path.getsize(full)
         self.send_response(200)
-        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Type", _header_value(ctype))
         self.send_header("Content-Length", str(size))
         self.end_headers()
         if self.command == "HEAD":
@@ -1151,6 +1159,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 if not b:
                     break
                 self.wfile.write(b)
+
+
+def _contained(path):
+    """The resolved path if it lies inside a root this node serves, else None.
+    The roots: the pages (ark-web), the map viewer, and the archive itself."""
+    real = os.path.realpath(path)
+    for root in (WEB, MAPDIR, store.ROOT):
+        if not root:
+            continue
+        base = os.path.realpath(root)
+        if real.startswith(base + os.sep):
+            return real
+    return None
+
+
+def _header_value(v):
+    """A header value with no line breaks. The values sent are fixed strings and
+    mimetypes' own table, so this never changes one; it makes that a property of
+    the code rather than of every caller."""
+    return str(v).replace("\r", "").replace("\n", "")
 
 
 class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
@@ -1265,7 +1293,15 @@ def kit_selftest():
              [("crosscheck", False), ("primary", True)]),
             ("models_view copies, not mutates",
              (models_view(starter, frozenset()) and "installed" in starter["primary"]),
-             False)]:
+             False),
+            # The one containment check every served file passes (2026-10-04).
+            ("a page inside ark-web is served",
+             _contained(os.path.join(WEB, "index.html"))
+             == os.path.realpath(os.path.join(WEB, "index.html")), True),
+            ("a path that climbs out of the archive is refused",
+             _contained(os.path.join(store.ROOT, "..", "outside.txt")), None),
+            ("the archive folder itself is not a file to serve",
+             _contained(store.ROOT), None)]:
         if got == want:
             print("  ok    kit    %s" % name)
         else:

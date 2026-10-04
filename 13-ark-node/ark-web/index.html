@@ -1201,6 +1201,10 @@ function closeFrame() {
    existing document and leave the map exactly where it was, which looks like a
    dead button. Moving the map means a new frame. */
 function openFrame(url, label) {
+  /* ONLY THE MAP VIEWER (2026-10-04). url comes from a data-map attribute the
+     node wrote ("/map/#lat,lon,zoom"); refusing anything else means no text that
+     reaches the page can become a frame's address. CodeQL, first scan. */
+  if (typeof url !== 'string' || url.indexOf('/map/') !== 0) { return; }
   var box = document.getElementById('map-frame');
   box.innerHTML = '';
   var f = document.createElement('iframe');

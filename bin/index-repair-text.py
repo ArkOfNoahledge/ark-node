@@ -68,8 +68,10 @@ pdf_tables = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(pdf_tables)
 
 # The build's _WS MINUS \s. Ordinary whitespace is left exactly as it is.
-_ODD = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f ​"
-                  " -   　]+")
+# WRITTEN WITH ESCAPES (2026-10-04): the same characters as before, but a range
+# typed as invisible spaces could not be read, by a person or by CodeQL.
+_ODD = re.compile("[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f\\u00a0\\u200b"
+                  "\\u2000-\\u200a\\u202f\\u205f\\u3000]+")
 
 
 def repair(t):

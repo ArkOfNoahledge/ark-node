@@ -957,7 +957,7 @@ class Store:
         C:\\Windows to whoever is on the WiFi."""
         base = os.path.realpath(ROOT)
         full = os.path.realpath(os.path.join(base, rel.replace("/", os.sep)))
-        if full != base and not full.startswith(base + os.sep):
+        if not full.startswith(base + os.sep):      # the base itself is a folder
             return None
         return full if os.path.isfile(full) else None
 

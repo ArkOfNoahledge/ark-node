@@ -105,8 +105,12 @@ CUES = CUES_EN + CUES_ES
 # real questions - `Where in New Zealand is wild camping permitted?`, which is a
 # location question - and a fourth word buys nothing at all. Measured both ways
 # rather than picked.
+# ONE \s* WHERE THERE WERE TWO (2026-10-04). `where\s*(?:abouts)?\s*` put two
+# adjacent \s* side by side whenever `abouts` was absent, which a long run of
+# spaces can make backtrack polynomially (CodeQL, first scan). Moving the first
+# one inside the optional group matches exactly the same strings.
 WHERE_IS = re.compile(
-    r"^\s*where\s*(?:abouts)?\s*(?:\w+\s+){0,3}(?:is|are|was|were)\b")
+    r"^\s*where(?:\s*abouts)?\s*(?:\w+\s+){0,3}(?:is|are|was|were)\b")
 
 # The same shape in Spanish. `donde queda X` and `donde esta X` are the copula;
 # `donde puedo comprar` is the shopping question the English measurement caught,
