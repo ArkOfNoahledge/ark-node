@@ -609,8 +609,8 @@ are left alone, matching what kiwix-serve's own viewer calls a
 1. **The stoplist is imported from `bin/index-bm25.py`, not copied.** A second copy
    would drift, and that is the file where drift is least acceptable — it is
    hand-tuned for this corpus, where `well` is a water well and `can` is a jerry
-   can. When this becomes its own repository, `bin/` moves in as `ops/` per §6 and
-   the import becomes local.
+   can. In the public repository `bin/` sits beside `13-ark-node/` exactly as in the
+   archive (decided 2026-10-01), so the import works unchanged.
 2. **Cross-artifact duplicates are not suppressed.** *Where There Is No Doctor*
    appears from both `zimgit-medicine` and `zimgit-post-disaster` and both are
    shown. Deliberate: `index-filter.py` already recorded that cross-artifact dedupe
@@ -660,17 +660,18 @@ are left alone, matching what kiwix-serve's own viewer calls a
    the content would have hurt someone. **Grounding is not correctness**, and the
    two are easy to confuse precisely because the interface shows the first. See
    BUILD-LOG, *The first dangerous answer, and it was grounded*.
-5. **Version control, decided 2026-09-04.** This directory is the authored copy;
-   the git working copy lives outside the archive, mirroring the website split,
-   because the synced mount cannot unlink git's lock files (`PUSH.md`).
-   **Scope: the surface only.** `ark-api/`, `ark-web/`, `README.md`, `RECOVERY.md`,
-   `.gitignore`. `bin/` stays archive-only and joins later as `ops/` per
-   `NODE-ARCHITECTURE.md` §6, once the stoplist duplication is settled — a design
-   decision that should not block history from starting.
+5. **Version control, decided 2026-09-04; public since 2026-10-04.** This
+   directory is the authored copy; git working copies live outside the archive,
+   mirroring the website split, because the synced mount cannot unlink git's lock
+   files. There are two. A private one holds the surface and `bin/` (as `ops/`) and
+   has no remote. **The public one is `github.com/ArkOfNoahledge/ark-node`**: an
+   export of an approved list of files, copied byte for byte and refused if any file
+   names a private path, with `bin/` beside `13-ark-node/` as in the archive.
 
-   **Private first.** The local-path review is its own step before it is ever made
-   public; `PUSH.md` records why that order matters, since private to public is one
-   click and public to private is not.
+   **Private first, then public.** The local-path review came first, as its own
+   step, because private to public is one click and public to private is not. The
+   repository went public on 2026-10-04 with release `v0.1.0`, after a clean
+   machine test: a new Windows account, the README alone, no stops.
 
    **`RUNBOOK.md` is deliberately untracked**, exactly as `PUSH.md` is in the
    website repo. It names one machine's own paths and a username inside a
@@ -678,8 +679,10 @@ are left alone, matching what kiwix-serve's own viewer calls a
    actually failed. `RECOVERY.md` is the generic, publishable procedure and is what
    §8.10 requires.
 
-   **A clone cannot run on its own**, and that is not a defect: this is a window
-   onto a 1.6 TB archive that is not in the repository. `store.py` locates the
+   **A clone runs on its own since v0.1.0**: `python bin/ark.py setup --profile
+   starter` downloads a starter library and builds the index beside the code (see
+   the README at the top of the repository). The full 2.4 TB archive is not in the
+   repository and never will be; the catalog lists it. `store.py` locates the
    archive by `ARK_ROOT` or by its own position on disk, and imports the stoplist
    from `bin/index-bm25.py` rather than copying it.
 
