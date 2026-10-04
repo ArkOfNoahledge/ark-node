@@ -1,0 +1,33 @@
+name: Wrong, unsafe or unsourced answer
+description: An answer that is wrong, cites the wrong passage, or could hurt someone who acted on it.
+labels: ["answer"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Answers people may act on are the part of this project that matters most.
+        If the answer could cause harm, start the title with **SAFETY**.
+  - type: input
+    id: question
+    attributes:
+      label: The question, exactly as you asked it
+    validations:
+      required: true
+  - type: textarea
+    id: answer
+    attributes:
+      label: The answer, and what is wrong with it
+      description: Paste the answer as text. Say which sentence is wrong and why, and what the right answer is if you know it, with a source.
+    validations:
+      required: true
+  - type: textarea
+    id: passages
+    attributes:
+      label: The cited passages
+      description: The titles shown in the sources column, and whether the passage actually says what the answer claims.
+  - type: input
+    id: setup
+    attributes:
+      label: Your setup
+      description: Starter kit or more content, the model profile (8gb, 12gb, 16gb, 24gb), and whether the cross-check model is on.
+      placeholder: starter kit, 16gb, cross-check off

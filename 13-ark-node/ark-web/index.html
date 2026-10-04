@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ark of Noahledge — node</title>
+<!--
+  ONE SURFACE, THREE PANES. NODE-ARCHITECTURE.md §4.
+
+  Only the source pane is live. The answer and map panes are present and say
+  plainly that they are empty, rather than being hidden until they work: an
+  operator must always know what the node can and cannot currently do, which is
+  the same rule §7 item 3 states for degraded-mode routing.
+
+  NO FRAMEWORK, NO BUILD STEP, NO EXTERNAL REQUEST. One file, served by
+  ark-api/serve.py off the archive. It has to render on a machine that has never
+  been online, which is the same test the public site's offline artifact is held
+  to. Palette from 11-Website/src/brand-palette.md so the node and the site are
+  visibly the same project.
+-->
+<style>
+:root {
+  --ground:#15120D; --surface:#252119; --surface-2:#1D1912;
+  --ink:#E6DFD0; --ink-soft:#C1BAAC; --muted:#938B7D;
+  --rule:#3A352A; --rule-soft:#2A251D;
+  --sun:#E69C3B; --day:#6AA7F4; --warn:#EF7F72; --good:#62BB78;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --body: "Newsreader", Georgia, "Times New Roman", serif;
+  --disp: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-theme="light"] {
+  --ground:#ECE6DC; --surface:#F9F6F1; --surface-2:#F4F0E8;
+  --ink:#17140F; --ink-soft:#433E34; --muted:#6A6459;
+  --rule:#D2CBBE; --rule-soft:#E4DFD5;
+  --sun:#985800; --day:#135298; --warn:#902822; --good:#006527;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--body);
+       font-size:16px; line-height:1.5; }
+header { position:sticky; top:0; z-index:5; background:var(--ground);
+         border-bottom:1px solid var(--rule); padding:.6rem 1rem;
+         display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+.brand { font-family:var(--disp); font-weight:800; letter-spacing:-.02em;
+         font-size:1rem; white-space:nowrap; }
+.brand .m { color:var(--sun); }
+form { display:flex; gap:.5rem; flex:1 1 320px; min-width:0; }
+input[type=search] { flex:1 1 auto; min-width:0; background:var(--surface);
+  border:1px solid var(--rule); color:var(--ink); border-radius:3px;
+  padding:.5rem .7rem; font:inherit; }
+input[type=search]:focus { outline:2px solid var(--sun); outline-offset:1px; }
+button, select { background:var(--surface); color:var(--ink); border:1px solid var(--rule);
+  border-radius:3px; padding:.5rem .6rem; font-family:var(--mono); font-size:.78rem;
+  cursor:pointer; }
+button:hover, select:hover { border-color:var(--sun); color:var(--sun); }
+.lab { font-family:var(--mono); font-size:.68rem; letter-spacing:.12em;
+       text-transform:uppercase; color:var(--muted); }
+
+/* ---- the Services menu, 2026-09-27 (services.js, home.html) ---- */
+a.brand { color:var(--ink); text-decoration:none; }
+a.brand:hover { color:var(--sun); }
+.svc { position:relative; }
+.svc > summary { list-style:none; background:var(--surface); color:var(--ink);
+  border:1px solid var(--rule); border-radius:3px; padding:.5rem .6rem;
+  font-family:var(--mono); font-size:.78rem; cursor:pointer; white-space:nowrap; }
+.svc > summary::-webkit-details-marker { display:none; }
+.svc > summary:hover, .svc[open] > summary { border-color:var(--sun); color:var(--sun); }
+.svc-menu { position:absolute; right:0; top:calc(100% + .35rem); z-index:20; width:340px;
+  max-width:calc(100vw - 2rem); background:var(--surface); border:1px solid var(--rule);
+  border-radius:4px; padding:.35rem 0; box-shadow:0 8px 24px rgba(0,0,0,.35);
+  font-family:var(--mono); font-size:.78rem; }
+.svc-menu a, .svc-menu .off { display:flex; gap:.6rem; align-items:center;
+  padding:.45rem .9rem; color:var(--ink); text-decoration:none; }
+.svc-menu a:hover, .svc-menu a:focus-visible { background:var(--surface-2); color:var(--sun); outline:none; }
+.svc-menu .off { color:var(--muted); cursor:default; }
+.svc-menu .h { padding:.5rem .9rem .2rem; font-size:.64rem; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--muted); }
+.svc-menu .h.w { color:var(--warn); }
+.svc-menu hr { border:0; border-top:1px solid var(--rule); margin:.35rem 0; }
+.svc-menu .r { margin-left:auto; color:var(--muted); font-size:.7rem; white-space:nowrap; }
+.svc-menu .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none; }
+/* lv- PREFIX: this page already has a .warn class (the safety box), and a bare
+   "dot warn" inherited its border and padding and drew a blob. */
+.svc-menu .dot.lv-up { background:var(--good); } .svc-menu .dot.lv-down { background:var(--warn); }
+.svc-menu .dot.lv-warn { background:var(--sun); } .svc-menu .dot.lv-far { background:var(--day); }
+.svc-menu .dot.lv-off { background:var(--muted); }
+.svc-menu .gap { width:7px; flex:none; }
+
+main { display:grid; grid-template-columns: 1fr 1.35fr; gap:1px;
+       background:var(--rule-soft); min-height:calc(100vh - 3.4rem); }
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+section.pane { background:var(--ground); padding:1rem; min-width:0; }
+.pane > h2 { font-family:var(--disp); font-size:.82rem; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 .8rem; font-weight:600; }
+
+.empty { border:1px dashed var(--rule); border-radius:4px; padding:1rem;
+         color:var(--muted); font-size:.9rem; }
+.empty b { color:var(--ink-soft); font-weight:600; }
+
+.hit { background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+       padding:.8rem .9rem; margin-bottom:.75rem; }
+.hit .top { display:flex; gap:.5rem; align-items:baseline; flex-wrap:wrap;
+            margin-bottom:.4rem; }
+.hit .t { font-family:var(--disp); font-weight:700; font-size:1rem; line-height:1.2; }
+.hit .txt { color:var(--ink-soft); font-size:.95rem; }
+.chip { font-family:var(--mono); font-size:.64rem; letter-spacing:.08em;
+        text-transform:uppercase; border:1px solid var(--rule); border-radius:2px;
+        padding:.12rem .34rem; color:var(--muted); white-space:nowrap; }
+.chip.both { color:var(--good); border-color:var(--good); }
+.chip.keyword { color:var(--sun); border-color:var(--sun); }
+.chip.dense { color:var(--day); border-color:var(--day); }
+/* THE PLACE A PASSAGE IS ABOUT. A chip and not a card: it fires on 9.2% of
+   chunks, so roughly one hit in ten carries one, and it must sit in the row of
+   facts about the passage rather than compete with the passage. It is a button
+   because it does something - it moves the map - and a span that moves a map is
+   a lie to anyone using a keyboard. */
+.chip.place { font:inherit; font-family:var(--mono); font-size:.64rem;
+              letter-spacing:.08em; text-transform:uppercase; background:none;
+              color:var(--day); border:1px dashed var(--day); border-radius:2px;
+              padding:.12rem .34rem; cursor:pointer; white-space:nowrap; }
+.chip.place:hover:not([disabled]) { border-style:solid; }
+.cite { margin-top:.5rem; font-family:var(--mono); font-size:.72rem;
+        color:var(--muted); word-break:break-all; }
+.cite a { color:var(--day); }
+.agree { border-left:3px solid var(--rule); padding:.4rem .7rem; margin-bottom:.9rem;
+         font-size:.85rem; color:var(--ink-soft); }
+.agree.low  { border-left-color:var(--warn); }
+.agree.weak { border-left-color:var(--sun); }
+.agree.good { border-left-color:var(--good); }
+.agree.single { border-left-color:var(--muted); }
+.warn { border:1px solid var(--warn); border-left-width:3px; border-radius:4px;
+        padding:.6rem .8rem; margin-bottom:.9rem; color:var(--ink-soft);
+        font-size:.9rem; }
+.warn b { color:var(--warn); }
+/* SAFETY MARKS. Deliberately not red: this is not an error and not a claim that
+   the number is wrong. It marks the figures rule 9.2 says to verify before
+   acting, which on most pages is the reason the page was opened. */
+.sf { border-bottom:1px solid var(--sun); box-shadow:inset 0 -0.55em 0 -0.1em rgba(230,156,59,.16); }
+.verify { border:1px solid var(--sun); border-left-width:3px; border-radius:4px;
+          padding:.6rem .8rem; margin-bottom:.9rem; font-size:.9rem;
+          color:var(--ink-soft); }
+.verify b { color:var(--sun); }
+.verify .terms { font-family:var(--mono); font-size:.8rem; color:var(--ink); }
+.chip.sfx { border-color:var(--sun); color:var(--sun); }
+.note { font-size:.8rem; color:var(--muted); margin-top:.6rem; }
+footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(--mono);
+         font-size:.7rem; color:var(--muted); display:flex; gap:1rem; flex-wrap:wrap; }
+.bad { color:var(--warn); }
+
+/* ---- answer pane ---- */
+#answer .ans { font-size:1rem; line-height:1.55; white-space:pre-wrap; }
+.badge { display:inline-block; font-family:var(--mono); font-size:.7rem;
+         letter-spacing:.04em; text-transform:uppercase; padding:.12rem .45rem;
+         border:1px solid var(--rule); border-radius:3px; margin-right:.4rem; }
+.badge.grounded   { border-color:var(--good); color:var(--good); }
+.badge.uncovered  { border-color:var(--day);  color:var(--day); }
+.badge.model_only { border-color:var(--warn); color:var(--warn); }
+.badge.unsourced  { border-color:var(--warn); color:var(--warn); }
+.xc.cancelled     { border-color:var(--warn); }
+/* THE ATTRIBUTE NEEDS THIS RULE TO MEAN ANYTHING. `hidden` hides an element
+   through the user-agent stylesheet's `display:none`, and ANY author `display`
+   rule outranks it - so `#thread { display:flex }` silently un-hid the element
+   and `box.hidden = true` set an attribute that did nothing. The line stayed on
+   screen after Clear, and showed empty on a fresh page, which is the opposite
+   of the decision it was written to implement. Caught by looking at it. */
+#thread[hidden]   { display:none; }
+#thread           { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem;
+                    padding:.5rem .9rem; border-bottom:1px solid var(--line);
+                    background:var(--bg2); font-size:.8rem; }
+#thread .tlab     { font:600 10px/1 var(--mono); letter-spacing:.08em;
+                    opacity:.7; }
+#thread .tq       { display:inline-block; max-width:34ch; overflow:hidden;
+                    text-overflow:ellipsis; white-space:nowrap;
+                    vertical-align:bottom; padding:.15rem .5rem; margin-right:.4rem;
+                    border:1px solid var(--line); border-radius:99px; }
+#thread #tclear   { margin-left:auto; font-size:.75rem; padding:.2rem .7rem; }
+#thread .tnote    { flex-basis:100%; color:var(--muted); font-size:.75rem; }
+.fup              { border-left:3px solid var(--line); padding:.4rem .8rem;
+                    margin:0 0 .8rem; font-size:.85rem; }
+/* THE SAME QUIET WEIGHT AS .fup, DELIBERATELY. This line is true on every
+   search, so dressing it as a warning would train the operator to skip it -
+   the argument this build already made on 09-10 about the unsourced block.
+   It earns attention by being specific, not by being loud. */
+.unidx            { border-left:3px solid var(--line); padding:.4rem .8rem;
+                    margin:.8rem 0 0; font-size:.8rem; color:var(--muted); }
+.unidx a          { font-weight:600; }
+.unsrc.open       { border:1px dashed var(--line); border-radius:6px;
+                    padding:.6rem .8rem; margin:.6rem 0; }
+.unsrc.open .lbl  { font:600 11px/1.4 var(--mono); letter-spacing:.04em;
+                    text-transform:uppercase; opacity:.75; margin-bottom:.35rem; }
+/* COLLAPSED BY DEFAULT, WARNING NEVER COLLAPSED. The block is real capability -
+   the archive is finite and an emergency is not - but a paragraph of unverified
+   model recall appended to every uncovered question would wear the label out by
+   repetition. So the warning stays open and the content folds. */
+.unsrc { border:1px solid var(--warn); border-left-width:3px; border-radius:4px;
+         padding:.55rem .7rem; margin:.6rem 0; }
+.unsrc > summary { cursor:pointer; font-family:var(--mono); font-size:.78rem;
+                   color:var(--warn); }
+.unsrc .body { margin-top:.5rem; white-space:pre-wrap; }
+.chip.adjacent { border-color:var(--day); color:var(--day); }
+.adjnote { font-size:.78rem; color:var(--day); margin:.35rem 0 .1rem;
+           border-left:2px solid var(--day); padding-left:.5rem; }
+/* A CITATION CHIP IS A CONTROL, NOT DECORATION. It scrolls to the passage the
+   claim came from, which is what turns §9.2 from a discipline into one click. */
+.cite-chip { font-family:var(--mono); font-size:.75rem; cursor:pointer;
+             border:1px solid var(--day); color:var(--day); border-radius:3px;
+             padding:0 .25rem; }
+.cite-chip:hover { background:var(--day); color:var(--ground); }
+.hit.flash { outline:2px solid var(--day); outline-offset:3px; }
+.xc { margin-top:1rem; border-left:3px solid var(--rule); padding:.5rem .8rem;
+      font-size:.85rem; color:var(--ink-soft); }
+.xc.agree            { border-left-color:var(--good); }
+.xc.disagree         { border-left-color:var(--warn); }
+.xc.both_unsupported { border-left-color:var(--day); }
+.xc.running          { border-left-color:var(--sun); }
+.xc b { color:var(--ink); }
+.xc table { border-collapse:collapse; margin-top:.4rem; font-family:var(--mono);
+            font-size:.75rem; }
+.xc td { border:1px solid var(--rule); padding:.1rem .4rem; }
+.tools { margin-top:.8rem; }
+.tools button { font:inherit; font-size:.8rem; background:var(--surface-2);
+                color:var(--ink-soft); border:1px solid var(--rule);
+                border-radius:3px; padding:.25rem .6rem; cursor:pointer; }
+
+/* THE PLACE OFFER HAS TWO SHAPES, BECAUSE IT IS TWO DIFFERENT THINGS.
+   `spatial` is what the question asked and gets a card. `place` is context the
+   question happened to carry and gets a line. They fire at 0.042% and 0.783% of
+   real questions respectively - the second is 86 times more common - so making
+   them look alike would put a map card beside every passing mention of a
+   country. bin/measure-spatial-cues.py is where those numbers come from. */
+.place { background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+         padding:.75rem .9rem; }
+.place h3 { font-family:var(--disp); font-size:.95rem; margin:0 0 .2rem;
+            color:var(--ink); font-weight:600; }
+.place .co { font-family:var(--mono); font-size:.76rem; color:var(--ink-soft); }
+.place .co a { color:var(--day); }
+.place .cmd { font-family:var(--mono); font-size:.71rem; background:var(--surface-2);
+              border:1px solid var(--rule-soft); border-radius:3px;
+              padding:.4rem .5rem; margin-top:.55rem; white-space:pre-wrap;
+              word-break:break-all; color:var(--ink-soft); }
+.place .alts { font-size:.78rem; color:var(--muted); margin-top:.55rem; }
+.place .alts button { font:inherit; font-family:var(--mono); font-size:.71rem;
+                      background:none; border:0; border-bottom:1px dotted var(--rule);
+                      color:var(--ink-soft); cursor:pointer; padding:0 0 1px;
+                      margin-right:.5rem; }
+.place .alts button:hover { color:var(--sun); border-bottom-color:var(--sun); }
+.place .why { font-size:.75rem; color:var(--muted); margin-top:.6rem; }
+.place .why summary { cursor:pointer; color:var(--ink-soft); }
+.place .sep { border:0; border-top:1px solid var(--rule-soft); margin:.8rem 0; }
+.place .dist b { color:var(--sun); }
+
+/* The quiet form. A left rule and nothing else: present, findable, and unable
+   to compete with the answer it sits under. */
+.placeline { font-size:.8rem; color:var(--muted); margin-top:.9rem;
+             border-left:2px solid var(--rule); padding-left:.6rem; }
+.placeline b { color:var(--ink-soft); font-weight:600; }
+.placeline a { color:var(--day); }
+.placeline .c { font-family:var(--mono); font-size:.74rem; }
+
+/* A DISABLED BUTTON MUST SAY WHY. Without the tile server the frame is a grey
+   rectangle with no explanation, which reads as a broken node rather than an
+   unstarted one. */
+button[disabled] { opacity:.45; cursor:not-allowed; }
+#map-frame { margin-top:.8rem; }
+#map-frame iframe { width:100%; height:24rem; border:1px solid var(--rule);
+                    border-radius:4px; background:var(--surface-2); display:block; }
+
+/* §9.5 wants a printable card, because paper survives the node. */
+#card { display:none; }
+/* THE CARD REPLACES THE SCREEN, IT DOES NOT ACCOMPANY IT.
+   First print preview came out three pages: the whole answer pane, headings,
+   badges, token counts and the model's own scratchpad, and THEN the card. §9.5
+   wants a thing a person can carry away - question, answer, sources, date - not
+   a screenshot of an interface. So `main` goes entirely and only #card remains. */
+@media print {
+  /* HIDE THE PANES, NOT THEIR CONTAINER. The previous version hid `main`
+     outright and printed a blank page, because #card lives INSIDE main. Every
+     pane child is hidden and the card is put back, so the printed artefact is
+     the card and nothing else. */
+  header, footer, #sourcepane { display:none !important; }
+  main { display:block !important; }
+  .pane { display:block !important; border:0 !important; padding:0 !important; }
+  .pane > * { display:none !important; }
+  #card { display:block !important; }
+  #card { display:block; font-family:Georgia,serif; }
+  #card h1 { font-size:1.1rem; margin:0 0 .4rem; }
+  #card .meta { font-size:.75rem; color:#444; margin-bottom:.8rem; }
+  #card .src { font-size:.75rem; margin-top:.2rem; word-break:break-all; }
+  main { display:block; }
+  .pane { border:0; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="/home/" title="Everything this node serves">ARK<span class="m">·</span>NODE</a>
+  <form id="f">
+    <input type="search" id="q" placeholder="Ask the archive…" autocomplete="off" autofocus>
+    <select id="mode" title="hybrid is keyword plus the semantic half; the first hybrid query after a restart loads the embedding model and takes about half a minute. keyword needs no model and no vector store.">
+      <option value="hybrid" selected>hybrid</option>
+      <option value="keyword">keyword</option>
+      <option value="dense">dense</option>
+    </select>
+    <button type="submit">Search</button>
+  </form>
+  <details class="svc" id="svc">
+    <summary title="Everything else this node serves">Services ▾</summary>
+    <div class="svc-menu" id="svc-menu">
+      <a href="/home/"><span class="gap"></span>Home: all services<span class="r">/home/</span></a>
+    </div>
+  </details>
+  <button type="button" id="theme" title="light / dark">◐</button>
+</header>
+
+<!-- THE THREAD, AND IT IS HIDDEN UNTIL THERE IS ONE. Juan's call: an empty row
+     of chrome on every fresh page teaches nothing and costs every reader. The
+     line appears with the first question and shows EXACTLY what will be sent -
+     never a longer history the operator cannot see, never a summary. If the node
+     is carrying it, it is on screen. -->
+<div id="thread" hidden>
+  <span class="tlab">IN THIS THREAD</span>
+  <span id="tqs"></span>
+  <button type="button" id="tclear">Clear thread</button>
+  <div class="tnote">Sent with your next question, and used only if that question
+    is too short to search on its own.</div>
+</div>
+
+<main>
+  <section class="pane" id="sourcepane">
+    <h2>Sources — what the archive actually says</h2>
+    <div class="empty" id="src-empty">
+      <b>Nothing asked yet.</b><br>
+      This pane is the archive itself, not a summary of it. Every passage below is a
+      real chunk of a real file on the drive, and every citation opens the page it
+      came from.
+    </div>
+    <div id="hits"></div>
+  </section>
+
+  <section class="pane">
+    <h2>Answer — read the sources beside it</h2>
+    <div class="empty" id="ans-empty">
+      <b>Nothing asked yet.</b><br>
+      The model answers from its own knowledge and checks it against the
+      archive. What the passages in the other pane support comes first, with a
+      citation on every claim; the model's own full answer follows in a marked
+      block that nothing here has verified.
+    </div>
+    <div id="answer"></div>
+    <div id="card"></div>
+    <div id="place"></div>
+
+    <div id="map-section">
+    <h2 style="margin-top:1.4rem">Map</h2>
+    <div id="map-offer"></div>
+    <div class="empty" id="map-pane">
+      <b>The map is a page of its own — <a href="/map/" target="_blank" rel="noopener">open it</a>.</b><br>
+      Protomaps basemap and Mapterhorn terrain, 843&nbsp;GB, drawn by MapLibre from
+      tiles served off this archive. Nothing leaves the machine. Ask about a place
+      and this pane will offer to open it here.
+      <div id="map-state" style="margin-top:.5rem">checking the tile server…</div>
+      <div id="map-fix" style="margin-top:.35rem"></div>
+    </div>
+    <div id="map-frame"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <span id="health">checking the node…</span>
+</footer>
+
+<script src="/api/ports.js"></script>
+<script src="/web/services.js"></script>
+<script>
+/* Plain DOM, no framework. The node has to be repairable by someone who is not
+   the author (§3.3, §8.10), and a build step is a dependency on a toolchain that
+   may not exist when it is needed. */
+var hits = document.getElementById('hits');
+var empty = document.getElementById('src-empty');
+
+document.getElementById('theme').addEventListener('click', function () {
+  var r = document.documentElement;
+  r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+});
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, function (c) {
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+/* WHICH LINK IS THE CITATION.
+   For a ZIM it is the /content/ form, because that is what this server's own
+   catalogue advertises: href="/content/<key>/...". The /viewer# form is offered
+   second, on purpose: the viewer parses its hash as #bookName/path, and on this
+   archive the book key itself contains a slash
+   (07-corpora-supplemental/mdwiki_en_all_maxi_2025-11), which that parsing is
+   likely to split in the wrong place. Both are rendered rather than guessed at -
+   the confirmed one leads, the other is there to be tried.
+   For a PDF it is the other way round: `url` carries the #page anchor and
+   `raw_url` does not, so the anchored one leads. */
+function primary(c) {
+  return c.kind === 'zim' ? c.raw_url : c.url;
+}
+
+/* Highlight the detector's spans without letting esc() move them.
+   The offsets index the RAW passage, so the string is cut on those offsets first
+   and each piece escaped separately. Escaping first and marking after would put
+   the marks in the wrong place on any passage containing an ampersand - which,
+   in an archive of wiki text, is most of them. */
+function markSafety(text, findings) {
+  if (!findings || !findings.length) { return esc(text); }
+  var out = '', at = 0;
+  findings.forEach(function (f) {
+    if (f.start < at || f.start > text.length) { return; }
+    out += esc(text.slice(at, f.start))
+         + '<span class="sf" title="' + esc(f.category + ' \u00b7 ' + f.tier) + '">'
+         + esc(text.slice(f.start, f.end)) + '</span>';
+    at = f.end;
+  });
+  return out + esc(text.slice(at));
+}
+
+function render(d) {
+  empty.style.display = 'none';
+  var a = d.agreement, h = '';
+  /* A degraded mode the operator cannot see is worse than one that fails.
+     Asking for hybrid and silently getting keyword was reproduced on
+     2026-09-04; the agreement line said 'single', which is true and reads
+     as a fact about the query rather than about the server. */
+  if (d.degraded) {
+    h += '<div class="warn"><b>Ran as ' + esc(d.mode_ran) + ', not '
+       + esc(d.mode) + '.</b><br>' + esc(d.degraded) + '</div>';
+  }
+  /* RULE 9.2, STATED WHERE THE DECISION IS MADE.
+     The spec's doctrine is that a question with a safety consequence gets
+     verified against the archive before anyone acts on it. Printing that in a
+     document nobody has open at the time is not the same as printing it here. */
+  if (d.safety && d.safety.render_text_only) {
+    h += '<div class="verify"><b>Verify before acting.</b> '
+       + (d.safety.firm_hits
+          ? esc(d.safety.firm_hits) + ' of these passages carry '
+          : 'This question carries ')
+       + esc((d.safety.query.categories.join(', ')) || 'safety-consequential figures')
+       + '. Rule 9.2: read the source passage, do not act on a summary.'
+       + (d.safety.cross_check
+          ? ' Rule 9.5: keep this on screen or write it down — not audio alone.'
+          : '')
+       + '</div>';
+  }
+  h += '<div class="agree ' + esc(a.label) + '"><span class="lab">retriever agreement: '
+     + esc(a.label) + '</span><br>'
+     + esc(a.why || (a.in_both + ' of the results were found by both retrievers'))
+     + '</div>';
+  if (!d.results.length) {
+    h += '<div class="empty"><b>Nothing matched.</b><br>The archive may not cover this. '
+       + 'That is a fact about the corpus, not an error.</div>';
+  }
+  d.results.forEach(function (r) {
+    var c = r.citation;
+    h += '<div class="hit">'
+       + '<div class="top"><span class="t">' + esc(c.title) + '</span>'
+       + '<span class="chip ' + esc(r.from) + '">' + esc(r.from) + '</span>'
+       + '<span class="chip">' + esc(c.artifact) + '</span>'
+       + (c.lang ? '<span class="chip">' + esc(c.lang) + '</span>' : '')
+       + (c.page ? '<span class="chip">p.' + esc(c.page) + '</span>' : '')
+       + '<span class="chip">chunk ' + esc(c.chunk) + '</span>'
+       + (r.safety && r.safety.level !== 'none'
+          ? '<span class="chip sfx">' + esc(r.safety.categories.join(' ')) + '</span>'
+          : '')
+       + (r.places || []).map(function (p) {
+           return '<button type="button" class="chip place" data-map="' + esc(p.map)
+                + '" data-label="' + esc(p.label) + '" title="'
+                + esc(p.lat.toFixed(4) + ', ' + p.lon.toFixed(4))
+                + ' \u00b7 show on the map">' + esc(p.label.split(' (')[0]) + '</button>';
+         }).join('')
+       + '</div>'
+       // A PASSAGE NOBODY SEARCHED FOR HAS TO EXPLAIN ITSELF. This one was
+       // fetched because the passage above it names a table it does not carry,
+       // and presenting it silently among ranked hits would misrepresent how it
+       // got here. See _expand_references in ark-api/serve.py.
+       + (r.adjacent
+          ? '<div class="adjnote">fetched because ' + esc(r.adjacent.why)
+            + '. Not a search result.</div>'
+          : '')
+       + '<div class="txt">' + markSafety(r.text.slice(0, 700),
+                                          (r.safety || {}).findings)
+       + (r.text.length > 700 ? '…' : '') + '</div>'
+       + '<div class="cite">' + esc(c.shelf) + ' \u2192 <a href="' + esc(primary(c))
+       + '" target="_blank" rel="noopener">' + esc(primary(c)) + '</a>'
+       + (c.kind === 'zim' ? ' &middot; <a href="' + esc(c.url)
+          + '" target="_blank" rel="noopener">viewer</a>' : '')
+       + (c.book_verified === false ? ' <span class="chip">book key unverified</span>' : '')
+       + '</div>'
+       + '</div>';
+  });
+  var s = d.suppressed;
+  if (s.navigation || s.same_document) {
+    h += '<div class="note">Suppressed: ' + s.navigation + ' navigation page(s) — tag '
+       + 'listings and tables of contents, which match many words and answer nothing — '
+       + 'and ' + s.same_document + ' further passage(s) from a document already shown.</div>';
+  }
+  h += '<div class="note">' + d.results.length + ' shown · ' + d.seconds + 's · mode '
+     + esc(d.mode) + (d.dense_available ? '' : ' · dense retrieval not loaded') + '</div>';
+  hits.innerHTML = h;
+  wirePlaceChips();
+}
+
+
+/* ------------------------------------------------------------------ answer */
+var LAST = null, POLL = null;
+
+/* ------------------------------------------------------------------ thread */
+/* THE BROWSER HOLDS THE THREAD AND THE SERVER HOLDS NOTHING - the 2026-09-09
+   decision, argued in serve.prev_questions(): a session here would bring
+   identity, eviction and unbounded growth to the one layer that has stayed free
+   of all three, and two people on the same LAN cannot collide because there is
+   no shared state to collide in.
+
+   IN MEMORY ONLY, NOT localStorage. This node can be reached by more than one
+   person, and a conversation that outlives the tab is state nobody asked for.
+   Reload is then a guaranteed way back to a clean slate.
+
+   THE CAP IS THE SERVER'S AND IT IS MIRRORED HERE ON PURPOSE. serve.py bounds
+   what arrives at 2 questions of 400 characters - bounded on arrival, not deeper
+   in - and the surface shows exactly those two. A line that displayed more than
+   the server accepts would be a promise the node does not keep. */
+/* EVERY REQUEST CARRIES THE GENERATION IT WAS ASKED IN, and a reply from an
+   older one is thrown away. Measured on the node 2026-09-11 from the server's
+   own access log:
+
+     GET /api/search?...&prev_q=...      200
+     GET /api/crosscheck/cancel          200   <- Clear pressed here
+     GET /api/answer?...&prev_q=...      200   <- already in flight, landed after
+     GET /api/crosscheck?job=29086...    200   <- polling a job created AFTER
+
+   The cancel worked. The ANSWER did not know about it: Qwen takes about thirty
+   seconds, the request was already on the wire, and when it returned the server
+   dispatched a fresh cross-check and the browser began polling it. Clear stopped
+   one four-minute job and started another.
+
+   AND THE FETCH IS DELIBERATELY NOT ABORTED. Aborting would stop the callback
+   and leave `do_answer` running to completion server-side, dispatching a job
+   nobody holds the id of - an orphan that no cancel can reach. Letting the reply
+   land and discarding it is what makes the job cancellable. */
+var GEN = 0;
+
+var THREAD_MAX = 2, THREAD_CHARS = 400;
+var THREAD = [];
+
+function threadParam() {
+  return THREAD.map(function (t) {
+    return '&prev_q=' + encodeURIComponent(t);
+  }).join('');
+}
+
+function threadPush(q) {
+  var t = String(q || '').trim().slice(0, THREAD_CHARS);
+  if (!t) { return; }
+  /* most recent first, which is the order prev_questions() reads */
+  THREAD = [t].concat(THREAD.filter(function (x) { return x !== t; }))
+              .slice(0, THREAD_MAX);
+  renderThread();
+}
+
+function renderThread() {
+  var box = document.getElementById('thread');
+  if (!THREAD.length) { box.hidden = true; return; }
+  document.getElementById('tqs').innerHTML = THREAD.map(function (t) {
+    return '<span class="tq" title="' + esc(t) + '">' + esc(t) + '</span>';
+  }).join('');
+  box.hidden = false;
+}
+
+/* ONE CONTROL, ONE MEANING. A half-clear is a trap: the thread gone and the
+   previous answer still on screen looking current, belonging to a conversation
+   the operator just ended. So this empties the carried questions AND returns
+   both panes to their starting state.
+
+   AND IT FREES GEMMA'S SLOT. Without the cancel call the browser would stop
+   watching while the second model finished four minutes of work nobody would
+   read - the exact waste cancellation was built to end on 2026-09-10. Ending a
+   conversation is at least as clear a signal as asking a new question. Fire and
+   forget: a node that cannot be reached is not a reason to refuse to clear. */
+function threadClear() {
+  GEN++;                       /* everything in flight is now stale */
+  THREAD = [];
+  renderThread();
+  if (POLL) { clearInterval(POLL); POLL = null; }
+  LAST = null;
+  fetch('/api/crosscheck/cancel').catch(function () {});
+  document.getElementById('hits').innerHTML =
+    '<div class="empty"><b>Nothing asked yet.</b><br>' +
+    'The thread was cleared. Nothing from the last conversation is carried.</div>';
+  document.getElementById('answer').innerHTML =
+    '<div class="empty"><b>Nothing asked yet.</b></div>';
+  document.getElementById('map-offer').innerHTML = '';
+  document.getElementById('q').focus();
+}
+
+/* WHEN THE THREAD WAS ACTUALLY USED, SAY SO AND SAY WHAT WAS SEARCHED FOR.
+   `retrieval_query` and `followup_from` are in the payload ONLY when they differ
+   from the question, so their presence is the signal. The node searching for
+   something other than what the operator typed must never be silent - it is the
+   same principle as showing the passages beside the answer. */
+/* WHAT THIS NODE HOLDS AND DOES NOT SEARCH, with somewhere to go.
+
+   The index covers 29 artifacts. kiwix-serve holds 67. Until 2026-09-12 the
+   other 42 - Wikipedia EN and ES, Stack Overflow, Gutenberg, Wiktionary,
+   686 GB - were unreachable from the running node by any route, so the answer
+   pane's "NOT IN ARCHIVE" was wrong and nothing better could be offered. It can
+   now, and the link carries the operator's own question into Kiwix's full-text
+   search over every book on the drive.
+
+   SHOWN WHEN THE PAGE IS THIN, NOT ON EVERY SEARCH. The payload carries it
+   always - the fact does not depend on the result count - but a line repeated
+   under five good results is furniture, and furniture is what an operator stops
+   reading. Under nothing, or under a short page, it is the most useful thing on
+   the screen.
+
+   IT IS A LINK AND NOT A MERGE. A Kiwix hit has no chunk, no provenance row and
+   no byte offset, so it cannot carry a citation the way every result above it
+   does; folding them together would make one badge mean two things. */
+function unindexedNote(d, shown) {
+  var u = d && d.unindexed;
+  if (!u || !u.extra || !u.search_urls || !u.search_urls.length) { return ''; }
+  if (shown >= 4) { return ''; }
+  var names = (u.notable || []).map(function (n) {
+    return n.split('_')[0].replace('.com', '');
+  });
+  var uniq = names.filter(function (v, i) { return names.indexOf(v) === i; });
+  /* ONE LINK PER LANGUAGE, AND THE REASON IS MEASURED RATHER THAN STYLISTIC.
+     kiwix-serve 3.8.1 requires a book filter and honours exactly one language:
+     `books.filter.lang=eng&books.filter.lang=spa` answers 200 and silently
+     returns only the English books. So a single tidy link would hide all 9
+     Spanish artifacts on this drive from an operator asking in Spanish - the
+     wikem translation defect, arriving from the opposite direction. */
+  var links = u.search_urls.map(function (s) {
+    return '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' +
+      esc(s.label) + '</a> (' + esc(s.books) + ')';
+  }).join(' &middot; ');
+  return '<div class="unidx">This node searches <b>' + esc(u.indexed) +
+    '</b> of <b>' + esc(u.served) + '</b> archives. The other ' +
+    esc(u.extra) + ' are on the drive and readable, but not in the index' +
+    (uniq.length ? ' \u2014 including ' + esc(uniq.join(', ')) : '') +
+    '. Search them directly: ' + links +
+    '. Results there carry no citation and are not checked by this node.</div>';
+}
+
+function followupNote(d) {
+  if (!d || !d.retrieval_query) { return ''; }
+  return '<div class="fup"><b>Searched as a follow-up.</b> Your question was ' +
+    '<b>' + esc(d.query || '') + '</b>, which has too few words to search on. ' +
+    'The archive was searched for <b>' + esc(d.retrieval_query) + '</b> instead' +
+    (d.followup_from && d.followup_from.length
+      ? ', using the earlier question' +
+        (d.followup_from.length > 1 ? 's' : '') + ' in this thread'
+      : '') + '.</div>';
+}
+
+/* WHY AN UNSOURCED ANSWER GETS A SECOND SENTENCE ON A KEYWORD-ONLY NODE.
+   §3.4's degraded state is keyword-only - most often no keeper venv, which is
+   what a rebuilt machine starts in, though NOT ALWAYS: on 2026-09-15 a node
+   running under the keeper venv fell to keyword because numpy half-initialized
+   under two threads, and the banner asserting the venv as the cause sent the
+   operator to check the one thing that was already correct. The banner now
+   carries the cause the node MEASURED; this note is about the CONSEQUENCE,
+   which is the same whatever put the node here - and that is the configuration
+   LEAST able to find
+   the archive's answer and therefore MOST likely to reach for model recall
+   instead. Measured 2026-09-09: `how much chlorine to disinfect drinking
+   water` grounds in hybrid on the Hesperian table (2 drops per litre) and goes
+   unsourced in keyword, where the model offers 2-8 mg/L free chlorine - a unit
+   nobody holding a bottle of bleach can act on, in place of a table the archive
+   holds. So the operator is told which half ran, because "try again with the
+   semantic half" is an action and "not in the archive" is a dead end.
+   `mode_ran` and not `mode`: hybrid on a node whose vector half failed to load
+   RAN keyword, and the operator needs the truth about what happened. */
+function keywordOnlyNote(out) {
+  var r = (out && out.retrieval) || {};
+  if (r.mode_ran !== 'keyword') return '';
+  /* One <br>, not two: this used to sit at the end of a red warning paragraph
+     and now follows a single line of grey note. Leading whitespace in a caller
+     is not the caller's to guess at, so the separator lives here with the text
+     it separates. */
+  return '<br><b>Only the keyword half searched.</b> ' +
+    (r.dense_available === false
+      ? 'The semantic half is not loaded on this node, so a passage that ' +
+        'answers this in different words would not have been found. '
+      : 'This search was keyword-only, so a passage that answers this in ' +
+        'different words would not have been found. ') +
+    'The archive may still cover it. Try the same question in hybrid mode, ' +
+    'or in the words the source would use, before relying on the block below.';
+}
+
+/* Rule 3b tells the model to say so in the BLOCK'S FIRST SENTENCE when it
+   contradicts the cited answer, and to name the passage. So the signal is read
+   from where the rule puts it rather than inferred by comparing two texts,
+   which this node has no honest way to do. False negatives are possible - a
+   model that disagrees quietly - and that is why the block is shown open
+   rather than hidden behind this test. */
+/* llama-server reports the -a alias it was started with: `qwen-primary`,
+   `gemma-crosscheck`. The operator does not need the role suffix - they need to
+   know which model is talking, because two of them write into this pane. Falls
+   back to whatever the server said rather than inventing a name. */
+function modelName(raw) {
+  var t = String(raw || '').trim();
+  if (!t) { return 'the model'; }
+  t = t.split(/[\\/]/).pop().replace(/\.(gguf|bin)$/i, '');
+  var head = t.split('-')[0];
+  if (!head) { return t; }
+  return head.charAt(0).toUpperCase() + head.slice(1);
+}
+
+function conflictsWithArchive(block) {
+  var first = String(block || '').split(/(?<=[.!?])\s/)[0] || '';
+  /* NEGATIONS AND HEDGES FIRST, BECAUSE THE WORD IS PRESENT IN BOTH.
+     Measured on the node 2026-09-10, two live blocks that both tripped the
+     naive test and neither of which was a disagreement:
+       "It does not contradict the cited answer; the archive lacks..."
+       "This contradicts the cited answer only in that I can provide a general
+        pediatric dosing range from training"
+     The first is the model saying the opposite of a conflict. The second is the
+     hedge "only in that", which means "this is not really a contradiction".
+     Firing red on either is how a real disagreement stops being noticed. */
+  if (/\b(no|not|n't|never)\b[^.]{0,24}\b(contradict|conflict|disagree|differ)/i
+        .test(first)) { return false; }
+  if (/\bonly in (that|the sense|so far)\b/i.test(first)) { return false; }
+  return /\b(contradict|contradicts|disagree|disagrees|conflicts|differs|does not match|inconsistent)\b/i
+    .test(first);
+}
+
+function badge(g) {
+  var say = {grounded: 'grounded in the archive',
+             uncovered: 'archive does not cover this',
+             /* NOT "not in the archive". The node saw N passages and the
+                model reported on those; the archive holds 2,315,810 it did
+                not see. Measured 2026-09-09 on `how much chlorine to
+                disinfect drinking water`: hybrid returns the Hesperian
+                table and grounds the answer, keyword at n=3 misses it and
+                the same node says NOT IN ARCHIVE. The admission is true
+                about the passages and false about the archive. */
+             unsourced: 'Not in the passages found - model recall only',
+             /* GROUNDED, AND THE MODEL ADDED SOMETHING. The badge must not
+                read as a warning about the cited part - that part is as
+                grounded as any other grounded answer - and must not read as
+                plain `grounded` either, because there is unverified content
+                below it. Both halves in one line. */
+             grounded_plus: 'grounded in the archive + unsourced note',
+             model_only: 'model only - no citation'};
+  return '<span class="badge ' + esc(g) + '">' + esc(say[g] || g) + '</span>';
+}
+
+/* [3] becomes a control that scrolls to passage 3. Invented numbers were already
+   dropped server-side; anything left here resolves to a real passage. */
+function chips(text, cited) {
+  var ok = {};
+  (cited || []).forEach(function (k) { ok[k] = 1; });
+  return esc(text).replace(/\[(\d{1,2})\]/g, function (m, k) {
+    if (!ok[k]) { return ''; }
+    return '<span class="cite-chip" data-go="' + k + '">[' + k + ']</span>';
+  });
+}
+
+/* THE MARKER IS THE SEAM. answer.py writes it on its own line after NOT IN
+   ARCHIVE, and grounding() refuses to call anything `unsourced` unless the
+   admission came first - so if this splits, the admission is already above it. */
+var UNSOURCED_MARK = 'UNSOURCED - NOT FROM THE ARCHIVE';
+
+function splitUnsourced(text) {
+  var t = String(text || ''), i = t.toUpperCase().indexOf(UNSOURCED_MARK);
+  if (i < 0) { return [t, null]; }
+  return [t.slice(0, i), t.slice(i + UNSOURCED_MARK.length)];
+}
+
+function xcBox(j) {
+  if (!j) { return ''; }
+  if (j.state === 'running') {
+    return '<div class="xc running"><b>Second opinion running.</b> ' +
+      esc(modelName(j.model)) +
+      (j.recall_only
+        ? ' is being asked the same question with NO passages, because the '
+          + 'passages are what failed here. '
+        : ' is reading the same passages on the CPU. ') +
+      (j.elapsed ? esc(j.elapsed) + 's so far, ' : '') + 'about four minutes.</div>';
+  }
+  if (j.state === 'unavailable') {
+    /* NOT the same as "checked and disagreed". */
+    return '<div class="xc"><b>Not cross-checked.</b> The second model is not ' +
+      'running, so nothing was compared. ' + esc(j.detail || '') + '</div>';
+  }
+  if (j.state === 'error') {
+    return '<div class="xc"><b>Cross-check errored.</b> ' + esc(j.detail || '') +
+      ' Nothing was compared.</div>';
+  }
+  /* CANCELLED IS NOT "NOT NEEDED", AND THE WORDING CARRIES THE WHOLE WEIGHT.
+     The operator asked something else, so this check was stopped to free
+     Gemma's single slot. What they must not conclude from an area that has
+     stopped saying "running" is that the answer came back clean. So the box
+     stays, says nothing checked this answer in those words, and says how to
+     get the check back - which is the one thing an apologetic message would
+     leave out. */
+  if (j.state === 'cancelled') {
+    return '<div class="xc cancelled"><b>Cross-check CANCELLED. Nothing checked ' +
+      'this answer.</b> It was stopped when a newer question was asked, because ' +
+      'the second model has one slot and would have made that question wait. ' +
+      'This is not a result: no second opinion was formed, and none is coming. ' +
+      'To get one, ask this question again and leave it alone for about two and ' +
+      'a half minutes.</div>';
+  }
+  var c = j.comparison || {}, say = {
+    agree: 'The two model families agree',
+    disagree: 'The two model families DISAGREE',
+    both_unsupported: 'Both models said the archive does not cover this',
+    no_basis: 'No basis for comparison',
+    /* THE UNSOURCED STATES. Added 2026-09-09 with the states themselves, after
+       shipping compare() with four new names this map had never heard of: an
+       unknown state falls through to `|| c.state` and renders as the raw
+       identifier `agree_unsourced`, which is both meaningless and, next to an
+       unverified dose, reassuring. The wording never says "agree" alone - two
+       families sharing a training error is the failure this whole label
+       exists to expose. */
+    one_declined: 'One model would not answer without a source',
+    disagree_unsourced: 'Neither is sourced AND they DISAGREE',
+    agree_unsourced: 'Both recall the same figures - NEITHER IS SOURCED',
+    no_basis_unsourced: 'Neither is sourced, and nothing to compare',
+    /* NOT a comparison outcome. The second model produced nothing, and until
+       2026-09-10 that rendered as "No basis for comparison" - a phrase about
+       two answers, used to report the absence of one. */
+    no_answer: 'The second model returned NOTHING - nothing was checked'};
+  /* THE SECOND ANSWER ITSELF, WHICH THIS PANE USED TO DISCARD. Gemma spends
+     about four minutes of sixteen CPU threads writing a full answer,
+     and until 2026-09-10 the operator saw only a one-line verdict about it. The
+     comparison is a signal; the answer is information, and Juan's rule for this
+     node is that information is shown. Split on the marker so a recall-only
+     reply renders under its own label rather than showing the wrapper this node
+     put around it. */
+  var name = modelName(j.model), h = '';
+  if (j.text) {
+    var xp = splitUnsourced(j.text);
+    var xhead = String(xp[0] || '').trim(), xblk = xp[1] === null ? null
+                : String(xp[1]).trim();
+    if (xhead && !j.recall_only) {
+      h += '<div class="unsrc open"><div class="lbl">Answer from ' + esc(name) +
+        ', reading the same passages</div><div class="body">' +
+        esc(xhead) + '</div></div>';
+    }
+    if (xblk) {
+      h += '<div class="unsrc open"><div class="lbl">Answer from ' + esc(name) +
+        (j.recall_only ? ', asked with NO passages at all' : '') +
+        ' - NOT from the archive</div><div class="body">' +
+        esc(xblk) + '</div></div>';
+    }
+    /* A DOSING TABLE THAT STOPS MID-RANGE IS WORSE THAN NO TABLE.
+       Seen on the node 2026-09-10: Gemma's answer ended "36-47 lbs (16-21"
+       and the surface said nothing. `a.truncated` has been carried on the
+       primary's answer since 09-05 and rendered as a small "cut off" badge;
+       the second model's answer had the flag in its payload and no renderer at
+       all. llm.py's own comment says an answer that stops in the middle of a
+       dose is worse than no answer, so the surface SAYS SO - and says it as a
+       warning rather than a badge, because a half-written range reads as a
+       whole one. */
+    if (j.truncated) {
+      h += '<div class="warn"><b>' + esc(name) + '\'s answer was CUT OFF.</b>' +
+        ' It reached its token limit mid-sentence, so what you see above is ' +
+        'incomplete - a range or a table may be missing its second half. Do ' +
+        'not read the last line as finished.</div>';
+    }
+  }
+  h += '<div class="xc ' + esc(c.state === 'no_answer' ? 'warn' : c.state) +
+       '"><b>' + esc(say[c.state] || c.state) + '.</b> ' + esc(c.why || '');
+  if (c.state === 'no_answer') {
+    h += ' It ran for ' + esc(j.seconds || '?') + 's and produced no answer, so ' +
+         'the answer above is unchecked - not confirmed, and not disputed.';
+  }
+  var f = c.figures || {}, keys = Object.keys(f);
+  if (keys.length) {
+    h += '<table><tr><td></td><td>primary</td><td>cross-check</td></tr>';
+    keys.forEach(function (k) {
+      h += '<tr><td>' + esc(k) + '</td><td>' + esc(f[k].primary.join(', ')) +
+           '</td><td>' + esc(f[k].crosscheck.join(', ')) + '</td></tr>';
+    });
+    h += '</table>';
+  }
+  /* NOT A VERDICT, and the surface says so where the operator reads it rather
+     than only in the design notes. NODE-ARCHITECTURE §2: present the state, do
+     not average the answers, and never say which model is right. */
+  h += '<div class="note">This is a signal, not a verdict. Neither model is ' +
+       'authoritative; ' +
+       (j.recall_only
+         ? 'and here NEITHER read a passage - both answered from training, so '
+           + 'agreement is not evidence and disagreement is not a tiebreak. '
+           + 'Find an outside source.'
+         : 'disagreement means go to the passages.') +
+       '</div></div>';
+  return h;
+}
+
+/* THE CHIPS ARE WIRED AFTER THE LIST IS WRITTEN, not per chip as it is built,
+   because `render` assembles the whole pane as one string and there is nothing
+   to attach a listener to until it lands. */
+function wirePlaceChips() {
+  document.querySelectorAll('#hits button[data-map]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (b.disabled) { return; }
+      openFrame(b.getAttribute('data-map'), b.getAttribute('data-label') || '');
+    });
+  });
+  applyTiles();
+}
+
+function renderAnswer(out) {
+  LAST = out;
+  var box = document.getElementById('answer');
+  document.getElementById('ans-empty').style.display = 'none';
+  if (!out.answer) {
+    box.innerHTML = '<div class="warn"><b>No answer.</b><br>' +
+      esc(out.model_down || 'The model is not available.') + '</div>';
+    return;
+  }
+  var a = out.answer, h = '';
+  if (a.safety && a.safety.render_text_only) {
+    h += '<div class="verify"><b>Verify before acting.</b> This answer carries ' +
+      esc(a.safety.categories.join(', ') || 'safety-consequential figures') +
+      '. Rule 9.2: read the source passage. Rule 9.5: keep this on screen or ' +
+      'write it down, never audio alone.</div>';
+  }
+  h += '<div>' + badge(a.grounding) +
+       (a.truncated ? '<span class="badge model_only">cut off</span>' : '') +
+       '</div>';
+  if (a.grounding === 'model_only') {
+    h += '<div class="warn"><b>This answer cites nothing.</b><br>It was produced ' +
+      'without pointing at any passage, so there is no page to check it against. ' +
+      '§11.1: the model states incorrect specifics with complete confidence.</div>';
+  }
+  var parts = splitUnsourced(a.text);
+
+  /* ONE RENDERING FOR BOTH BLOCK-BEARING STATES, 2026-09-10.
+     There were two, and the neutral one sat in the branch nobody reaches. Rule
+     3b now asks for the block on EVERY answer, so `grounded_plus` and
+     `unsourced` differ only in whether the head is a cited answer or an
+     admission - and the model takes rule 3 whenever the passages genuinely do
+     not answer, which is most of the time. Rendering the same thing two ways
+     depending on a distinction the reader does not care about is how the old
+     collapsed fold survived a decision to stop hiding it.
+
+     A WARNING THAT FIRES ON EVERY ANSWER IS NOT A WARNING. The block's presence
+     now carries no information, so it is a plain open section with one line of
+     label. The red is spent on the two things that ARE signals: the model
+     saying it contradicts the archive, and a rule 3b violation. */
+  if (parts[1] !== null && (a.grounding === 'unsourced' ||
+                            a.grounding === 'grounded_plus')) {
+    var blk = String(parts[1]).trim();
+    h += '<div class="ans">' + chips(parts[0], a.cited) + '</div>';
+
+    if (conflictsWithArchive(blk)) {
+      h += '<div class="warn"><b>The model DISAGREES with the archive.</b><br>' +
+        'What the archive says and what the model says below do not match. ' +
+        'Neither is authoritative and this is not a verdict: go and read the ' +
+        'source passages yourself before acting on either.</div>';
+    }
+
+    h += '<div class="unsrc open"><div class="lbl">Answer from ' +
+      esc(modelName(a.model)) + ' - NOT from the archive. No passage supports ' +
+      'it and nothing here can check it</div><div class="body">' +
+      esc(blk) + '</div></div>';
+
+    /* Not red, and not a warning: this is retrieval telling the operator what
+       it did not do, and the action it names is one they can take. */
+    if (a.grounding === 'unsourced') {
+      var kn = keywordOnlyNote(out);
+      h += '<div class="note">The passages found do not answer this, so the ' +
+        'answer above the block is the model saying so.' +
+        (kn ? kn : '') + '</div>';
+    }
+
+    if (a.unsourced_citations) {
+      h += '<div class="warn"><b>Rule 3b violation.</b> The block contained ' +
+        esc(a.unsourced_citations) + ' citation marker(s). There is nothing to ' +
+        'cite there; a passage number in that block borrows authority the ' +
+        'passage does not give to a claim it does not make. Report this.</div>';
+    }
+  } else {
+    h += '<div class="ans">' + chips(a.text, a.cited) + '</div>';
+  }
+  h += '<div id="xc"></div>';
+  h += '<div class="tools"><button type="button" id="print">Print this card</button>' +
+       (a.reasoning ? ' <button type="button" id="showwork">Show working</button>' : '') +
+       '</div>';
+  h += '<div class="note">' + esc(a.completion_tokens) + ' tokens, ' +
+       esc(a.seconds) + 's, ' + esc(a.tokens_per_second) + ' t/s · ' +
+       esc(out.crosscheck_why || '') + '</div>';
+  if (a.reasoning) {
+    h += '<div class="note" id="work" style="display:none;white-space:pre-wrap">' +
+         esc(a.reasoning) + '</div>';
+  }
+  box.innerHTML = h;
+  buildCard(out);
+
+  box.querySelectorAll('.cite-chip').forEach(function (c) {
+    c.addEventListener('click', function () {
+      var k = parseInt(c.getAttribute('data-go'), 10);
+      var hit = document.querySelectorAll('#hits .hit')[k - 1];
+      if (!hit) { return; }
+      hit.scrollIntoView({behavior: 'smooth', block: 'center'});
+      hit.classList.add('flash');
+      setTimeout(function () { hit.classList.remove('flash'); }, 1600);
+    });
+  });
+  var pb = document.getElementById('print');
+  if (pb) { pb.addEventListener('click', function () { window.print(); }); }
+  var sw = document.getElementById('showwork');
+  if (sw) {
+    sw.addEventListener('click', function () {
+      var w = document.getElementById('work');
+      w.style.display = w.style.display === 'none' ? 'block' : 'none';
+    });
+  }
+
+  if (out.crosscheck_job) { pollCross(out.crosscheck_job); }
+}
+
+function pollCross(job) {
+  /* CAPTURED HERE, NOT BORROWED FROM THE SUBMIT HANDLER. This function is
+     called from renderAnswer(), which only runs for a live generation, so GEN
+     at this moment is the generation this poll belongs to. Reading the outer
+     handler's `gen` would have been a different scope and a silent global. */
+  var gen = GEN;
+  if (POLL) { clearInterval(POLL); }
+  var box = document.getElementById('xc');
+  var tick = function () {
+    fetch('/api/crosscheck?job=' + encodeURIComponent(job))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (gen !== GEN) { clearInterval(POLL); POLL = null; return; }
+        box.innerHTML = xcBox(j);
+        if (j.state !== 'running') {
+          clearInterval(POLL); POLL = null;
+          if (LAST) { LAST.crosscheck = j; buildCard(LAST); }
+        }
+      })
+      .catch(function () { clearInterval(POLL); POLL = null; });
+  };
+  tick();
+  POLL = setInterval(tick, 5000);
+}
+
+/* §9.5, and NODE-ARCHITECTURE §4: "Print is an output channel... because paper
+   survives the node." Question, answer, sources, date. */
+/* THE CARD MUST DROP AN INVENTED CITATION TOO.
+   The screen drops a [7] that was never supplied, because rendering it would
+   manufacture provenance. The card was printing the raw text, so the one
+   artefact meant to leave the building was the only one that showed them. Same
+   filter, plain text. It also tidies a stray unmatched bracket at the start,
+   which appeared once on 2026-09-05 and whose origin is NOT understood - if it
+   recurs, capture the raw answer rather than trusting this to hide it. */
+function cardText(a) {
+  var ok = {};
+  (a.cited || []).forEach(function (k) { ok[k] = 1; });
+  return String(a.text || '')
+    .replace(/\[(\d{1,2})\]/g, function (m, k) { return ok[k] ? m : ''; })
+    .replace(/^\s*[\]\[]+\s*/, '')
+    .trim();
+}
+
+function buildCard(out) {
+  var a = out.answer; if (!a) { return; }
+  /* LOCAL TIME, NOT UTC. A card printed at 13:02 that says 18:02 is a small
+     dishonesty on an artefact meant to outlive the machine that made it. */
+  var now = new Date();
+  var d = now.getFullYear() + '-' +
+          String(now.getMonth() + 1).padStart(2, '0') + '-' +
+          String(now.getDate()).padStart(2, '0') + ' ' +
+          String(now.getHours()).padStart(2, '0') + ':' +
+          String(now.getMinutes()).padStart(2, '0') + ' local';
+
+  /* THE CARD MUST SAY WHICH OF THE THREE IT IS, AND PAPER CANNOT UPDATE ITSELF.
+     A card printed while the second opinion was still running looked exactly
+     like a card where no second opinion was warranted: both simply omitted it.
+     On screen that distinction is drawn carefully; on paper it was dropped, and
+     paper is where it matters more, because the reader has no way to check. */
+  var xc;
+  if (out.crosscheck && out.crosscheck.comparison) {
+    xc = 'cross-check: ' + out.crosscheck.comparison.state;
+  } else if (out.crosscheck && out.crosscheck.state === 'unavailable') {
+    xc = 'cross-check: NOT RUN, second model was not available';
+  } else if (out.crosscheck && out.crosscheck.state === 'cancelled') {
+    /* A CANCELLED JOB STILL HAS AN ID, so without this branch the card below
+       would print "STILL RUNNING" about a check that was deliberately stopped
+       minutes earlier - paper asserting that something is in progress when
+       nothing is. Same class as the 2026-09-09 branch beneath it. */
+    xc = 'cross-check: CANCELLED, nothing checked this answer';
+  } else if (out.crosscheck_job) {
+    xc = 'cross-check: STILL RUNNING when this was printed - not yet checked';
+  } else if (a.safety && a.safety.cross_check) {
+    /* REQUIRED AND NEVER STARTED IS NOT THE SAME AS NOT REQUIRED, and until
+       2026-09-09 this branch conflated them. The unsourced path made that
+       reachable: safety.assess sets cross_check for any unsourced answer, so
+       with the second model down no job is created - and the old `else` printed
+       "not required, no figure reached the threshold" onto paper, about an
+       answer whose ONLY possible verification had not run. The card's own note
+       above says paper cannot update itself; this is the case it did not cover. */
+    xc = 'cross-check: REQUIRED AND NOT RUN - the second model was not available';
+  } else {
+    /* UNREACHABLE SINCE 2026-09-10 and kept as a named dead end rather than
+       deleted. `cross_check` is unconditional now, so a card can only get here
+       if that ever stops being true - and the sentence it used to print, "not
+       required", would then be printed onto paper about an answer nobody
+       checked. If this line is ever seen on a card, the contract broke. */
+    xc = 'cross-check: NOT RUN, and the node did not say why - report this card';
+  }
+
+  /* THE LABEL IS NOT ENOUGH ON PAPER. On screen `unsourced` sits beside a
+     warning paragraph and a fold the reader had to open. A printed card is read
+     by someone who saw neither, possibly days later, so the sentence travels
+     with it rather than the one-word state. */
+  /* ON PAPER THE TWO HALVES CANNOT BE TOLD APART BY LAYOUT, so the sentence
+     has to do it. A card printed from a grounded_plus answer that said only
+     "grounded" would present model recall as archive-backed to someone reading
+     it days later with no way to ask. */
+  var plusNote = (a.grounding === 'grounded_plus')
+    ? '<div class="meta"><b>PART OF THIS IS NOT FROM THE ARCHIVE.</b> The cited '
+      + 'answer stands on the passages listed below. The paragraph after the '
+      + 'UNSOURCED line does not: no passage supports it and nothing verified '
+      + 'it. Do not act on a figure from that part without an outside '
+      + 'reference.</div>'
+    : '';
+
+  var unsrcNote = (a.grounding === 'unsourced')
+    ? '<div class="meta"><b>NOT FROM THE ARCHIVE.</b> None of the passages '
+      + 'found supports the answer below - which is not the same as the archive '
+      + 'not holding one. It is one model\'s recall, unverified, and there is no '
+      + 'source to check it against. Do not act on any figure in it without an '
+      + 'outside reference.</div>'
+    : '';
+
+  var h = '<h1>' + esc(out.query) + '</h1>' +
+          '<div class="meta">Ark node · ' + esc(d) + ' · ' + esc(a.grounding) +
+          ' · ' + esc(xc) +
+          '</div>' + unsrcNote + plusNote +
+          '<div style="white-space:pre-wrap">' + esc(cardText(a)) + '</div>' +
+          '<h1 style="margin-top:1rem">Sources</h1>';
+  (out.retrieval.results || []).forEach(function (r, i) {
+    var c = r.citation;
+    h += '<div class="src">[' + (i + 1) + '] ' + esc(c.title || '') + ' — ' +
+         esc(c.shelf || '') + '<br>' + esc(primary(c)) + '</div>';
+  });
+  /* THE PLACE GOES ON THE PAPER AND THE MAP LINK DOES NOT. §8.10 is about what
+     survives with no screen: a coordinate can be read off a sheet into a GPS,
+     a paper chart or another machine, and a /map/ URL cannot be followed off
+     paper at all. The answer's own copy is preferred over this page's, so a
+     card printed after a failed /api/spatial fetch is still complete. */
+  var sp = out.spatial || SPATIAL;
+  if (sp && sp.places && sp.places.length) {
+    h += '<h1 style="margin-top:1rem">Place</h1>';
+    sp.places.forEach(function (p) {
+      h += '<div class="src">' + esc(p.label) + ' — ' + esc(coord(p)) +
+           '<br>climate: ' + esc(p.climate_command) + '</div>';
+    });
+    if (sp.distance_km !== null && sp.distance_km !== undefined) {
+      h += '<div class="src">' + esc(sp.distance_km) +
+           ' km apart, great-circle.</div>';
+    }
+  }
+  h += '<div class="src" style="margin-top:.6rem">Verify figures against the ' +
+       'source pages before acting on them. Spec rule 9.2.</div>';
+  document.getElementById('card').innerHTML = h;
+}
+
+/* ---------------------------------------------------------------------------
+   THE PLACE OFFER.
+
+   IT DOES NOT RIDE ON THE ANSWER, and that is the whole design. `/api/answer`
+   needs the primary model and takes about twenty seconds; `spatial.classify`
+   needs no model at all and returns in milliseconds. Carrying the offer on the
+   answer payload meant it arrived last, and vanished entirely whenever the
+   model was down - which is exactly the moment an operator most needs a
+   coordinate they can act on. §3.4: nothing that gates retrieval may depend on
+   a model, and a place is retrieval, not inference. So the surface asks
+   `/api/spatial` itself, in parallel with the search.
+
+   The answer payload still carries `spatial`, and the print card prefers it.
+   Same function, same query, so the two cannot disagree; the duplication buys
+   a card that is still correct if this fetch failed and the other did not.
+   --------------------------------------------------------------------------- */
+var TILES = null;      /* null while the probe runs, then true or false */
+/* The tile port, from the node (/api/ports.js); 8081 when it did not say. */
+var TILE_PORT = (window.ARK_PORTS && typeof window.ARK_PORTS.tiles === 'number')
+  ? window.ARK_PORTS.tiles : 8081;
+var SPATIAL = null;    /* last payload, so the printable card can carry a place */
+
+function coord(p) { return p.lat.toFixed(4) + ', ' + p.lon.toFixed(4); }
+
+function closeFrame() {
+  document.getElementById('map-frame').innerHTML = '';
+}
+
+/* THE VIEWER READS location.hash ONCE, AT LOAD, and has no hashchange
+   listener. Assigning a src that differs only in its fragment would scroll the
+   existing document and leave the map exactly where it was, which looks like a
+   dead button. Moving the map means a new frame. */
+function openFrame(url, label) {
+  var box = document.getElementById('map-frame');
+  box.innerHTML = '';
+  var f = document.createElement('iframe');
+  f.src = url;
+  f.title = 'map: ' + label;
+  box.appendChild(f);
+  var t = document.createElement('div');
+  t.className = 'tools';
+  t.innerHTML = '<button type="button" id="hidemap">Hide the map</button>';
+  box.appendChild(t);
+  document.getElementById('hidemap').addEventListener('click', closeFrame);
+  box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/* Called after every render and again when the probe resolves, because the
+   probe can finish either side of a question. */
+function applyTiles() {
+  var why = 'the tile server on :' + TILE_PORT + ' is not answering, so there is nothing to draw';
+  document.querySelectorAll('#map-offer button[data-map], #hits button[data-map]').forEach(function (b) {
+    if (TILES === false) { b.disabled = true; b.title = why; }
+    else { b.disabled = false; b.removeAttribute('title'); }
+  });
+
+  /* A DISABLED BUTTON AND A TOOLTIP ARE NOT AN EXPLANATION.
+     The card hides the pane's resting text, and the tile server's state and the
+     command that fixes it live INSIDE that resting text - so the instant a place
+     resolved, the diagnosis for why the map could not draw vanished with it. The
+     button greyed out and said nothing anyone could act on, and on a touch screen
+     the tooltip does not exist at all.
+
+     Found by opening a browser on 2026-09-07, with the tile server deliberately
+     stopped. No check caught it: the payload was right, every render assertion
+     passed, and the failure was one element hiding another. That is the third
+     time on this build that the degraded path was the broken one while the
+     working path looked fine. */
+  var card = document.querySelector('#map-offer .place');
+  var old = document.getElementById('tilewarn');
+  if (TILES === false && card && !old) {
+    var w = document.createElement('div');
+    w.id = 'tilewarn';
+    w.className = 'warn';
+    w.style.marginTop = '.7rem';
+    w.innerHTML = '<b>The map cannot draw.</b><br>The tile server on :' + TILE_PORT + ' is ' +
+      'not answering, so <b>Show it here</b> and the alternates are disabled. ' +
+      'The coordinates and the climate command above are unaffected.<br>' +
+      'Start it:<br><code>pmtiles serve &lt;ARCHIVE&gt;/08-maps --port ' + TILE_PORT + ' ' +
+      '--cors="*"</code>';
+    card.appendChild(w);
+  } else if (TILES !== false && old && old.parentNode) {
+    old.parentNode.removeChild(old);
+  }
+}
+
+function placeLine(d) {
+  /* ONE LINE, DELIBERATELY. `place` means the question is anchored on a place
+     without asking about it: 657 of 83,856 real questions, against 35 for
+     `spatial`. It is context, and context that shouts is noise. */
+  var p = d.places[0];
+  return '<div class="placeline"><b>' + esc(p.label) + '</b> is mentioned · ' +
+         '<span class="c">' + esc(coord(p)) + '</span> · ' +
+         '<a href="' + esc(p.map) + '" target="_blank" rel="noopener">open the map</a>' +
+         '<div style="margin-top:.2rem">' + esc(d.why) + '</div></div>';
+}
+
+function spatialCard(d) {
+  var h = '<div class="place">';
+  d.places.forEach(function (p, i) {
+    if (i) { h += '<hr class="sep">'; }
+    h += '<h3>' + esc(p.label) + '</h3>';
+    h += '<div class="co">' + esc(coord(p)) + ' · ' + esc(p.kind || 'place') +
+         ' · <a href="' + esc(p.map) + '" target="_blank" rel="noopener">' +
+         'open the map page</a></div>';
+
+    /* AMBIGUITY IS SHOWN, NOT RESOLVED SILENTLY. `cairo` answering Georgia was
+       a real defect on this build. The index fix was proximity identity; this
+       is the half that reaches the person reading. The tiles carry no state or
+       country, so all six Franklins are the string "Franklin" and there is no
+       honest way to label them apart - which is why the alternates are offered
+       as coordinates that move the map. The operator recognises the place by
+       seeing it, which is what the map is for. */
+    if (p.others) {
+      h += '<div class="alts">' + p.others + ' other place' +
+           (p.others === 1 ? '' : 's') + ' answer' + (p.others === 1 ? 's' : '') +
+           ' to this name, and the tiles carry no state or country to tell them ' +
+           'apart. They are where these are:<br>';
+      (p.others_brief || []).forEach(function (o) {
+        h += '<button type="button" data-map="' + esc(o.map) + '" data-label="' +
+             esc(o.label) + '">' + esc(coord(o)) + '</button>';
+      });
+      h += '</div>';
+    }
+
+    h += '<div class="cmd">' + esc(p.climate_command) + '</div>';
+    h += '<div class="tools">' +
+         '<button type="button" class="copycmd" data-cmd="' +
+         esc(p.climate_command) + '">Copy the climate command</button> ' +
+         '<button type="button" data-map="' + esc(p.map) + '" data-label="' +
+         esc(p.label) + '">Show it here</button></div>';
+    if (p.climate_note) {
+      h += '<div class="note">' + esc(p.climate_note) + '</div>';
+    }
+  });
+
+  /* FREE, BECAUSE THE GAZETTEER ALREADY MEASURES IT. It needs great-circle
+     distance to decide what counts as the same place, so two places in one
+     question cost nothing extra. */
+  if (d.distance_km !== null && d.distance_km !== undefined) {
+    h += '<div class="co dist" style="margin-top:.8rem"><b>' +
+         esc(d.distance_km) + ' km</b> apart, great-circle.</div>';
+  }
+
+  /* THE RULE THAT FIRED, IN THE OPERATOR'S OWN LANGUAGE. A matcher that is
+     wrong is only correctable by someone who can see why it matched, and this
+     one was wrong six times in ten before it was tightened. */
+  h += '<details class="why"><summary>why this appeared</summary>' +
+       esc(d.why) + '</details>';
+  return h + '</div>';
+}
+
+function renderSpatial(d) {
+  SPATIAL = d;
+  var offer = document.getElementById('map-offer');
+  var line = document.getElementById('place');
+  var rest = document.getElementById('map-pane');
+  offer.innerHTML = '';
+  line.innerHTML = '';
+  closeFrame();
+  rest.style.display = '';
+
+  /* NO GAZETTEER IS A STATE, NOT AN ABSENCE. Without this the pane looks
+     identical to a question that named no place, and the operator concludes the
+     archive holds nothing about Kathmandu. */
+  if (d.degraded) {
+    rest.style.display = 'none';
+    offer.innerHTML = '<div class="warn"><b>No gazetteer is loaded.</b><br>' +
+      esc(d.degraded) + '<br>No question can name a place until it is rebuilt: ' +
+      '<code>bin/index-gazetteer.py --build</code>. The sources beside this pane ' +
+      'are unaffected.</div>';
+    return;
+  }
+
+  if (d.intent === 'spatial') {
+    rest.style.display = 'none';
+    offer.innerHTML = spatialCard(d);
+    offer.querySelectorAll('.copycmd').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var cmd = b.getAttribute('data-cmd');
+        /* navigator.clipboard is unavailable over plain http on a LAN address
+           in several browsers, and this node is served over plain http by
+           design. The textarea fallback is not legacy cruft, it is the path
+           that actually runs here. */
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(cmd).then(function () {
+            b.textContent = 'Copied';
+          }, function () { select(cmd); });
+        } else { select(cmd); }
+      });
+    });
+    offer.querySelectorAll('button[data-map]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.disabled) { return; }
+        openFrame(b.getAttribute('data-map'), b.getAttribute('data-label') || '');
+      });
+    });
+    applyTiles();
+  } else if (d.intent === 'place') {
+    line.innerHTML = placeLine(d);
+  } else if (d.intent === 'cue_without_place') {
+    /* The node says why it did not do the thing the question seemed to ask
+       for, which is more useful than saying nothing. */
+    offer.innerHTML = '<div class="note">' + esc(d.why) + '</div>';
+  }
+}
+
+function select(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* selected, at least */ }
+  document.body.removeChild(ta);
+}
+
+document.getElementById('f').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var q = document.getElementById('q').value.trim();
+  if (!q) return;
+  var mode = document.getElementById('mode').value;
+  hits.innerHTML = '<div class="note">searching…</div>';
+  empty.style.display = 'none';
+  document.getElementById('ans-empty').style.display = 'none';
+  /* THE SOURCE PANE FILLS FIRST AND ON ITS OWN. Retrieval takes under a second
+     and the answer takes about twenty, so waiting for one payload would leave
+     the operator staring at nothing while the passages they could already read
+     sat finished on the server. It is also the degraded path: if the model is
+     down, this half still works and the surface shows it working. */
+  document.getElementById('answer').innerHTML =
+    '<div class="note">reading the passages…</div>';
+  if (POLL) { clearInterval(POLL); POLL = null; }
+
+  /* THE PLACE OFFER GOES OUT WITH THE SEARCH, NOT WITH THE ANSWER. It needs no
+     model and comes back in milliseconds, so it is on screen before the
+     passages are, and it is still there when no model is running at all. */
+  document.getElementById('map-offer').innerHTML = '';
+  document.getElementById('place').innerHTML = '';
+  closeFrame();
+  SPATIAL = null;
+  fetch('/api/spatial?q=' + encodeURIComponent(q))
+    .then(function (r) { return r.json(); })
+    .then(function (d) { if (gen === GEN) { renderSpatial(d); } })
+    .catch(function (err) {
+      document.getElementById('map-offer').innerHTML =
+        '<div class="note">the node did not answer /api/spatial: ' +
+        esc(err) + '. Everything else on this page is unaffected.</div>';
+    });
+
+  /* THE SOURCE PANE AND THE ANSWER MUST SHOW THE SAME LIST, IN THE SAME ORDER.
+     This asked for 8 passages while the answer was built from 5, and the [n]
+     chips index the rendered list by position - so chip [3] could scroll to a
+     passage the answer never cited. An interface that points at the wrong source
+     is worse than one with no chips at all: it manufactures provenance, which is
+     the single thing this node exists to prevent. Same n here, and the pane is
+     re-rendered from the ANSWER's own payload when it arrives, so the alignment
+     is guaranteed by construction rather than by both calls happening to agree. */
+  /* THE THREAD GOES OUT WITH BOTH CALLS, AND IT IS CAPTURED BEFORE THIS
+     QUESTION JOINS IT. `threadPush` runs after, so a question is never sent as
+     its own context - which would make a short question expand into itself and
+     search for nothing new. */
+  var carried = threadParam();
+  var gen = ++GEN;             /* this question's generation */
+
+  fetch('/api/search?q=' + encodeURIComponent(q) + '&n=5&mode=' + mode + carried)
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (gen !== GEN) { return; }
+      if (d.error) { hits.innerHTML = '<div class="empty bad">' + esc(d.error) + '</div>'; return; }
+      render(d);
+      /* prepended rather than folded into render(), because render() is also
+         called from the answer payload and the note must not be drawn twice */
+      hits.insertAdjacentHTML('afterbegin', followupNote(d));
+      /* AFTERBEGIN for the follow-up note, BEFOREEND for this one. The
+         follow-up note corrects what was searched and must be read before the
+         results; this one is where to go NEXT and belongs after them. */
+      hits.insertAdjacentHTML('beforeend',
+        unindexedNote(d, (d.results || []).length));
+    })
+    .catch(function (err) {
+      hits.innerHTML = '<div class="empty bad"><b>The node did not answer.</b><br>'
+        + esc(err) + '</div>';
+    });
+
+  fetch('/api/answer?q=' + encodeURIComponent(q) + '&n=5&mode=' + mode + carried)
+    .then(function (r) { return r.json(); })
+    .then(function (out) {
+      /* STALE, AND IT MUST CLEAN UP AFTER ITSELF. The server started a
+         cross-check for this answer while the operator was clearing the
+         thread; discarding the payload without cancelling would leave Gemma
+         working for four minutes on something nobody will ever see. */
+      if (gen !== GEN) {
+        if (out.crosscheck_job) {
+          fetch('/api/crosscheck/cancel').catch(function () {});
+        }
+        return;
+      }
+      if (out.error) {
+        document.getElementById('answer').innerHTML =
+          '<div class="empty bad">' + esc(out.error) + '</div>';
+        return;
+      }
+      /* re-render the sources from the payload the answer was actually built
+         from. Cheap, and it makes chip [n] and hit n the same object. */
+      if (out.retrieval) {
+        render(out.retrieval);
+        hits.insertAdjacentHTML('afterbegin', followupNote(out.retrieval));
+        hits.insertAdjacentHTML('beforeend',
+          unindexedNote(out.retrieval, (out.retrieval.results || []).length));
+      }
+      renderAnswer(out);
+    })
+    .catch(function (err) {
+      document.getElementById('answer').innerHTML =
+        '<div class="warn"><b>No answer.</b><br>' + esc(err) +
+        '<br>The sources beside this pane are unaffected.</div>';
+    });
+
+  /* JOINS THE THREAD AFTER `carried` WAS TAKEN, AND AFTER BOTH CALLS ARE OUT.
+     Every question joins, whether or not it used the thread, because the NEXT
+     one may need it. Placed at the end so an early return above cannot leave a
+     question half-joined to a conversation that never happened. */
+  threadPush(q);
+});
+
+document.getElementById('tclear').addEventListener('click', threadClear);
+
+// THE MAP PANE TELLS THE TRUTH ABOUT THE TILE SERVER, and it asks the tile
+// server itself rather than asking the node about it. That is deliberate: the
+// map is drawn by the browser, so the only question that matters is whether THIS
+// browser can reach :8081 with CORS - which is exactly what this fetch tests. A
+// server-side probe would pass while the map stayed blank for the reader.
+(function () {
+  var st = document.getElementById('map-state');
+  var fix = document.getElementById('map-fix');
+  if (!st) return;
+  var url = location.protocol + '//' + location.hostname + ':' + TILE_PORT + '/20260825/0/0/0.mvt';
+  var done = false;
+  var t = setTimeout(function () {
+    if (!done) { done = true; st.textContent = 'tile server did not answer on :' + TILE_PORT + '.';
+                 TILES = false; applyTiles(); showFix(); }
+  }, 2500);
+  function showFix() {
+    fix.innerHTML = 'Start it:<br><code>pmtiles serve &lt;ARCHIVE&gt;/08-maps --port ' + TILE_PORT + ' --cors="*"</code>';
+  }
+  fetch(url, { method: 'GET', cache: 'no-store' }).then(function (r) {
+    if (done) return; done = true; clearTimeout(t);
+    if (r.ok) { st.innerHTML = '<b>Tiles are being served.</b> The map will draw.';
+                fix.textContent = ''; TILES = true; applyTiles(); }
+    else { st.textContent = 'tile server answered ' + r.status + ' - the archive may not be where it expects.';
+           TILES = false; applyTiles(); showFix(); }
+  }).catch(function () {
+    if (done) return; done = true; clearTimeout(t);
+    st.textContent = 'tile server unreachable on :' + TILE_PORT + '.';
+    TILES = false; applyTiles();
+    showFix();
+  });
+})();
+
+fetch('/api/health').then(function (r) { return r.json(); }).then(function (d) {
+  var f = document.getElementById('health');
+  f.innerHTML = d.index.artifacts + ' artifacts · '
+    + d.index.documents.toLocaleString() + ' documents · '
+    + d.index.chunks.toLocaleString() + ' chunks · keyword '
+    + (d.keyword_search ? 'ready' : 'DOWN') + ' · dense '
+    + (d.dense_search ? 'ready' : 'not loaded')
+    + ' · kiwix expected at ' + esc(d.kiwix_base);
+  if (d.degraded.length) { f.className = 'bad'; }
+  // NO MAPS IN THIS KIT, NO MAP PANE (2026-10-04). The starter has no 08-maps,
+  // and the pane told a new user to start a tile server for a folder they do
+  // not have.
+  if ((d.not_installed || []).indexOf('map') >= 0) {
+    document.getElementById('map-section').hidden = true;
+  }
+}).catch(function () {
+  document.getElementById('health').textContent = 'the node is not answering /api/health';
+});
+
+/* THE SERVICES MENU (2026-09-27). The list and the reachability check live in
+   services.js, shared with /home/, so the two cannot disagree. The menu is
+   checked when it is opened rather than on a timer: the search page should not
+   be probing five ports every few seconds for a menu nobody has looked at.
+   Other ports open in a new tab so the thread on this page survives. */
+(function () {
+  var S = window.ARK_SERVICES;
+  var box = document.getElementById('svc');
+  var menu = document.getElementById('svc-menu');
+  if (!S) { menu.insertAdjacentHTML('beforeend',
+      '<div class="off">services.js did not load</div>'); return; }
+  S.fixHosts();   // citation links on a phone: see services.js
+
+  function item(s) {
+    var dead = s.localOnly && !S.local;
+    var inner = '<i class="dot" id="m-dot-' + s.id + '"></i><span id="m-n-' + s.id + '">' + esc(s.name) + '</span>'
+      + '<span class="r" id="m-s-' + s.id + '">' + esc(s.port) + (s.newTab ? ' \u2197' : '') + '</span>';
+    if (dead) return '<div class="off" title="The model pages accept connections from the node itself only">' + inner + '</div>';
+    return '<a href="' + esc(s.href) + '"' + (s.newTab ? ' target="_blank" rel="noopener"' : '')
+      + '>' + inner + '</a>';
+  }
+  var by = function (g) { return S.list.filter(function (s) { return s.group === g && s.id !== 'search'; }); };
+  var h = '<hr><div class="h">From the archive</div>' + by('archive').map(item).join('')
+        + '<div class="h w">Models alone · no citations</div>' + by('model').map(item).join('')
+        + '<hr>' + by('node').map(item).join('');
+  menu.insertAdjacentHTML('beforeend', h);
+
+  function refresh() {
+    S.check().then(function (r) {
+      S.list.forEach(function (s) {
+        var d = document.getElementById('m-dot-' + s.id);
+        if (!d) return;
+        var st = r.state[s.id];
+        d.className = 'dot lv-' + st.level;
+        if (st.name) document.getElementById('m-n-' + s.id).textContent = st.name;
+        if (st.level === 'down' || st.level === 'far' || st.level === 'off') {
+          // Short, so a name never wraps: the full wording is on /home/.
+          document.getElementById('m-s-' + s.id).textContent =
+            st.level === 'far' ? 'this computer only'
+            : st.level === 'off' ? st.text
+            : (s.localOnly && !S.local ? 'not running' : st.text);
+        } else {
+          document.getElementById('m-s-' + s.id).textContent = s.port + (s.newTab ? ' \u2197' : '');
+        }
+      });
+    });
+  }
+  box.addEventListener('toggle', function () { if (box.open) refresh(); });
+  document.addEventListener('click', function (e) {
+    if (box.open && !box.contains(e.target)) box.open = false;
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && box.open) { box.open = false; box.querySelector('summary').focus(); }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+name: Setup or install problem
+description: ark.py setup, fetch, the index build or the servers did not do what you expected.
+labels: ["setup"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: The last screen of output
+      description: Paste it as text. If setup ran, also paste setup-report.txt from the folder you installed into.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `python bin\ark.py status`
+      render: text
+  - type: input
+    id: machine
+    attributes:
+      label: Your machine
+      description: Windows version, GPU and its memory, system RAM, Python version.
+      placeholder: Windows 11, RTX 4070 12 GB, 32 GB RAM, Python 3.12.9
+    validations:
+      required: true

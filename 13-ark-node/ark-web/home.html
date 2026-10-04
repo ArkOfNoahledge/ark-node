@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ark of Noahledge — services</title>
+<!--
+  THE SERVICES PAGE, 2026-09-27. Everything this node serves, one card each,
+  with whether THIS browser can reach it right now. `/` is still the search
+  page and stays so: the manual, DRILL-01 and RECOVERY all say open 8090 and
+  type in the search box, and they remain true (Juan's call, PLAN-services-home).
+
+  TWO GROUPS, DRAWN DIFFERENTLY, NEVER MIXED. The archive services answer from
+  the archive and show their source. The model pages answer from memory with
+  nothing looked up. Same service list as the search page's menu: services.js.
+
+  No framework, no build step, no external request. Palette and type from
+  index.html, which takes them from 11-Website/src/brand-palette.md.
+-->
+<style>
+:root {
+  --ground:#15120D; --surface:#252119; --surface-2:#1D1912;
+  --ink:#E6DFD0; --ink-soft:#C1BAAC; --muted:#938B7D;
+  --rule:#3A352A; --rule-soft:#2A251D;
+  --sun:#E69C3B; --day:#6AA7F4; --warn:#EF7F72; --good:#62BB78;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --body: "Newsreader", Georgia, "Times New Roman", serif;
+  --disp: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-theme="light"] {
+  --ground:#ECE6DC; --surface:#F9F6F1; --surface-2:#F4F0E8;
+  --ink:#17140F; --ink-soft:#433E34; --muted:#6A6459;
+  --rule:#D2CBBE; --rule-soft:#E4DFD5;
+  --sun:#985800; --day:#135298; --warn:#902822; --good:#006527;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--body);
+       font-size:16px; line-height:1.5; }
+header { position:sticky; top:0; z-index:5; background:var(--ground);
+         border-bottom:1px solid var(--rule); padding:.6rem 1rem;
+         display:flex; gap:.75rem; align-items:center; }
+.brand { font-family:var(--disp); font-weight:800; letter-spacing:-.02em;
+         font-size:1rem; white-space:nowrap; color:var(--ink); text-decoration:none; }
+.brand .m { color:var(--sun); }
+.sp { flex:1; }
+button, .btn { background:var(--surface); color:var(--ink); border:1px solid var(--rule);
+  border-radius:3px; padding:.45rem .6rem; font-family:var(--mono); font-size:.78rem;
+  cursor:pointer; text-decoration:none; }
+button:hover, .btn:hover { border-color:var(--sun); color:var(--sun); }
+main { max-width:1040px; margin:0 auto; padding:1.6rem 1rem 2rem; }
+h1 { font-family:var(--disp); font-size:1.5rem; margin:0 0 .2rem; letter-spacing:-.01em; }
+.lead { color:var(--ink-soft); margin:0 0 .6rem; max-width:62ch; }
+.lab { font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+       color:var(--muted); margin:1.5rem 0 .6rem; }
+.lab.w { color:var(--warn); }
+.grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:.8rem; }
+@media (max-width: 860px) { .grid { grid-template-columns:1fr 1fr; } }
+@media (max-width: 560px) { .grid { grid-template-columns:1fr; } }
+.tile { display:flex; flex-direction:column; gap:.35rem; text-decoration:none; color:inherit;
+        background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+        padding:1rem 1rem .8rem; min-height:168px; }
+a.tile:hover, a.tile:focus-visible { border-color:var(--sun); outline:none; }
+.tile.model { background:var(--surface-2); border-style:dashed; }
+.tile.dead { cursor:default; opacity:.8; }
+.ic { width:34px; height:34px; stroke:var(--sun); fill:none; stroke-width:1.6;
+      stroke-linecap:round; stroke-linejoin:round; }
+.model .ic, .node .ic { stroke:var(--muted); }
+.t { font-family:var(--disp); font-weight:700; font-size:1.02rem; }
+.d { color:var(--ink-soft); font-size:.9rem; flex:1; }
+.st { font-family:var(--mono); font-size:.7rem; color:var(--muted); display:flex; gap:.45rem;
+      align-items:center; border-top:1px solid var(--rule); padding-top:.5rem; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
+.dot.up { background:var(--good); } .dot.down { background:var(--warn); }
+.dot.warn { background:var(--sun); } .dot.far { background:var(--day); }
+.dot.off { background:var(--muted); }
+.tile.off { opacity:.55; pointer-events:none; }
+.port { margin-left:auto; white-space:nowrap; }
+.note { font-size:.88rem; color:var(--ink-soft); border-left:2px solid var(--warn);
+        padding:.2rem .7rem; margin:0 0 .8rem; max-width:72ch; }
+#status { margin-top:1.6rem; background:var(--surface); border:1px solid var(--rule);
+          border-radius:4px; padding:1rem; scroll-margin-top:4rem; }
+#status h2 { font-family:var(--disp); font-size:1rem; margin:0 0 .6rem; }
+#status table { border-collapse:collapse; width:100%; font-family:var(--mono); font-size:.78rem; }
+#status td { border-top:1px solid var(--rule-soft); padding:.35rem .5rem .35rem 0; vertical-align:top; }
+#status td:first-child { color:var(--muted); width:12rem; }
+@media (max-width: 560px) { #status td:first-child { width:38%; } }
+#status .bad { color:var(--warn); }
+#status a { color:var(--day); }
+footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(--mono);
+         font-size:.7rem; color:var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="/">ARK<span class="m">·</span>NODE</a>
+  <span class="sp"></span>
+  <a class="btn" href="/">Search</a>
+  <button type="button" id="theme" title="light / dark">◐</button>
+</header>
+
+<main>
+  <h1>What this node is serving</h1>
+  <p class="lead">Everything running on this machine, in one place. The first three
+    answer from the archive and show the page they came from. The next two are the
+    models on their own. The last is the node's own health.</p>
+
+  <div class="lab">From the archive · every answer has a source</div>
+  <div class="grid" id="g-archive"></div>
+
+  <div class="lab w">The models alone · no archive, no citations</div>
+  <p class="note">These talk to a model directly. Nothing is looked up, so an answer
+    here is the model's memory and can be confidently wrong. Check anything that
+    matters on the cards above.</p>
+  <div class="grid" id="g-model"></div>
+
+  <section id="status" aria-live="polite">
+    <h2>Node status</h2>
+    <div id="status-body">Asking the node…</div>
+  </section>
+</main>
+
+<footer id="foot">checking…</footer>
+
+<script src="/api/ports.js"></script>
+<script src="/web/services.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = window.ARK_SERVICES;
+  document.getElementById('theme').addEventListener('click', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  if (!S) {
+    document.getElementById('foot').textContent =
+      'services.js did not load - the node is serving an incomplete ark-web folder.';
+    return;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function n(x) { return (x == null) ? '?' : Number(x).toLocaleString(); }
+
+  /* The node card sits with the models in the mockup Juan approved; it is its
+     own kind, so it is drawn solid and grey rather than dashed. */
+  function card(s) {
+    var dead = s.localOnly && !S.local;
+    var cls = 'tile ' + (s.group === 'model' ? 'model' : s.group === 'node' ? 'node' : '')
+            + (dead ? ' dead' : '');
+    var tag = dead ? 'div' : 'a';
+    var attrs = dead ? '' : ' href="' + esc(s.href) + '"'
+      + (s.newTab ? ' target="_blank" rel="noopener"' : '');
+    return '<' + tag + ' class="' + cls + '" id="c-' + s.id + '"' + attrs + '>'
+      + S.icon(s.icon)
+      + '<span class="t" id="t-' + s.id + '">' + esc(s.name) + '</span>'
+      + '<span class="d" id="d-' + s.id + '">' + esc(s.desc) + '</span>'
+      + '<span class="st"><i class="dot" id="dot-' + s.id + '"></i>'
+      + '<span id="s-' + s.id + '">checking…</span>'
+      + '<span class="port">' + esc(s.port) + '</span></span>'
+      + '</' + tag + '>';
+  }
+  var ga = '', gm = '';
+  S.list.forEach(function (s) { if (s.group === 'archive') ga += card(s); else gm += card(s); });
+  document.getElementById('g-archive').innerHTML = ga;
+  document.getElementById('g-model').innerHTML = gm;
+
+  /* LIVE FIGURES, NOT WRITTEN-DOWN ONES. Every rounded number this project has
+     put on a page went stale first; these come from the node each time. */
+  function describe(h) {
+    if (!h || !h.index) return;
+    var ix = h.index, u = ix.unindexed || {};
+    document.getElementById('d-search').textContent =
+      'Search ' + n(ix.chunks_searchable != null ? ix.chunks_searchable : ix.chunks)
+      + ' passages from ' + n(ix.artifacts) + ' sources, in English or Spanish. '
+      + 'Every answer cites the passage it used.';
+    if (u.served) {
+      document.getElementById('d-library').textContent =
+        'All ' + n(u.served) + ' books, page by page, in Kiwix. '
+        + (u.extra ? n(u.extra) + ' of them are readable here and not in search.' : '');
+    }
+    if (h.spatial && h.spatial.names) {
+      document.getElementById('d-map').textContent =
+        'The whole planet with terrain, and ' + n(h.spatial.names)
+        + ' place names you can find by name.';
+    }
+  }
+
+  function row(k, v, bad) {
+    return '<tr><td>' + esc(k) + '</td><td' + (bad ? ' class="bad"' : '') + '>' + v + '</td></tr>';
+  }
+  function statusPanel(h) {
+    var b = document.getElementById('status-body');
+    if (!h) { b.innerHTML = '<p class="bad">The node did not answer <code>/api/health</code>.</p>'; return; }
+    var ix = h.index || {}, u = ix.unindexed || {}, m = h.models || {}, sp = h.spatial || {};
+    var dense = h.dense_search
+      ? 'ready · ' + esc(h.dense_backend || '') + ' over ' + n(h.dense_coverage) + ' vectors'
+      : (h.dense_attempted ? 'FAILED TO LOAD · keyword only'
+                           : 'not loaded yet · it loads on the first hybrid search');
+    function model(r) {
+      var x = m[r];
+      if (!x) return 'unknown';
+      if (x.installed === false) return 'not installed';
+      return x.ok ? 'running' + (x.model ? ' · ' + esc(x.model) : '') : 'not running';
+    }
+    function down(r) { return !(m[r] && (m[r].ok || m[r].installed === false)); }
+    function label(r, fallback, job) {
+      return ((m[r] && m[r].name) || fallback) + ' (' + job + ')';
+    }
+    var noMap = (h.not_installed || []).indexOf('map') >= 0;
+    var pend = h.pending || [];
+    var deg = h.degraded || [];
+    b.innerHTML = '<table>'
+      + row('index', n(ix.artifacts) + ' sources · ' + n(ix.documents) + ' documents · '
+            + n(ix.chunks) + ' passages' + (ix.chunks_searchable != null
+              ? ' · ' + n(ix.chunks_searchable) + ' searchable' : ''))
+      + row('keyword search', h.keyword_search ? 'ready' : 'DOWN', !h.keyword_search)
+      + row('meaning search', dense, h.dense_attempted && !h.dense_search)
+      + row('library', u.served ? n(u.served) + ' books served · ' + n(u.indexed) + ' in search'
+                                : esc(u.state || 'unknown'))
+      + row(label('primary', 'Qwen', 'answers'), model('primary'), down('primary'))
+      + row(label('crosscheck', 'Gemma', 'cross-check'), model('crosscheck'), down('crosscheck'))
+      + row('gazetteer', sp.names ? n(sp.names) + ' place names'
+            : (noMap ? 'not installed' : 'not loaded'), !sp.names && !noMap)
+      + row('safety detector', (h.safety_detector && h.safety_detector.ok === false)
+            ? 'NOT OK' : 'ok', h.safety_detector && h.safety_detector.ok === false)
+      + row('up for', h.uptime_seconds != null
+            ? Math.round(h.uptime_seconds / 60) + ' min' : '?')
+      + row('degraded', deg.length ? deg.map(esc).join('<br>') : 'nothing', deg.length > 0)
+      + (pend.length ? row('pending', pend.map(esc).join('<br>')) : '')
+      + '</table><p style="font-family:var(--mono);font-size:.72rem;color:var(--muted);margin:.7rem 0 0">'
+      + 'Raw report: <a href="/api/health" target="_blank" rel="noopener">/api/health</a>. '
+      + 'Same source as <code>python bin/ark.py status</code>.</p>';
+  }
+
+  function paint(r) {
+    S.list.forEach(function (s) {
+      var st = r.state[s.id];
+      document.getElementById('dot-' + s.id).className = 'dot ' + st.level;
+      document.getElementById('s-' + s.id).textContent = st.text;
+      document.getElementById('c-' + s.id).classList.toggle('off', st.level === 'off');
+      if (st.name) document.getElementById('t-' + s.id).textContent = st.name;
+    });
+    describe(r.health);
+    statusPanel(r.health);
+    document.getElementById('foot').textContent = 'checked from this browser at '
+      + new Date().toLocaleTimeString() + ' · rechecks every 10 s'
+      + (S.local ? '' : ' · opened from another device: the model pages open only on the node itself');
+  }
+  function tick() { S.check().then(paint); }
+  tick();
+  setInterval(tick, 10000);
+})();
+</script>
+</body>
+</html>

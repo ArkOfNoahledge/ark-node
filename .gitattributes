@@ -1,0 +1,15 @@
+# Git must never touch line endings in this repository.
+#
+# Every file here is checksummed where it is used: a shelf's CHECKSUMS.sha256
+# records each file's sha256, and `python bin/ark.py verify` checks it. Git's
+# default on Windows (core.autocrlf=true) rewrites LF to CRLF on checkout. The
+# code still runs and stops hashing to the value it was released with, so a
+# verify reports a modified file that nobody modified.
+#
+# This is not hypothetical. On 2026-09-30 the archive this repository comes from
+# found that every small text file it had taken from Hugging Face with a Windows
+# git checkout had been converted to CRLF: 96 files, configs and tokenizers
+# among them, which matched no upstream checksum until `ark.py fetch --lf` put
+# the LF bytes back. `-text` on everything disables the conversion for every
+# file, on every machine that clones this, whatever its global git config.
+* -text

@@ -1,0 +1,37 @@
+Ark node
+Copyright 2026 Juan Hurtado, founder of Ark of Noahledge
+(https://www.linkedin.com/in/juaneshurtado),
+and the Ark of Noahledge contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+Its documentation is licensed under CC BY 4.0 (see LICENSE-docs).
+
+This repository contains no third-party code, models or content. The tools in
+it download and install the following on your machine, each under its own
+licence, which binds you and not this project:
+
+Programs that `ark.py setup` downloads and unpacks
+  llama.cpp (ggml-org)                 MIT
+  NVIDIA CUDA runtime libraries        NVIDIA CUDA Toolkit End User License
+    (cudart-llama-bin-*.zip)           Agreement, redistributable components
+  kiwix-tools (Kiwix)                  GPL-3.0
+
+Python packages that `ark.py setup` installs with pip
+  (13-ark-node/requirements/node.txt and index.txt, and what they depend on)
+  Mostly permissive (BSD, MIT, Apache-2.0). Two are copyleft:
+  PyMuPDF                              AGPL-3.0, or a commercial licence from
+                                       Artifex. Used only by the index build,
+                                       to read PDFs inside ZIM files; the node
+                                       does not import it.
+  libzim (python-libzim)               GPL-3.0
+  Used as separate programs and libraries installed by the user, not
+  distributed with this product.
+
+Models and content
+  Each row of 13-ark-node/catalog/catalog.csv names its licence, whether that
+  licence has been verified against the upstream terms (license_status), and
+  whether the item may be redistributed (redistribute). Some items may not be
+  redistributed, or only non-commercially. Read those columns before you build
+  a node for someone else, and the upstream terms before you rely on them.
+
+The name "Ark of Noahledge" is not licensed by the Apache License or by CC BY.

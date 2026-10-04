@@ -1,0 +1,30 @@
+# What the node needs to SERVE with its dense half: BGE-M3 embeds each question
+# on the way in, and faiss holds the PQ index the passages are found in. Without
+# these the node still runs, by keyword only, and says so on every answer.
+#
+#   python bin/ark.py setup --profile starter     installs these and index.txt
+#
+# TORCH COMES FIRST, FROM PYTORCH'S OWN INDEX. The torch on PyPI for Windows is
+# the CPU build: it installs cleanly, imports cleanly, and embeds the starter
+# index in hours instead of minutes. `ark.py setup` reads the two lines below,
+# installs torch from that index, then everything else from PyPI, in that order.
+# By hand:
+#
+#   python -m pip install torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+#   python -m pip install -r 13-ark-node/requirements/index.txt
+#
+# One index for both passes is how a CPU torch, or a generic package from the
+# wrong index, arrives without anyone being told.
+#
+# The versions are the ones the reference node (16 GB card, Python 3.12) has run
+# since 2026-08-30. Newer ones may work; these are the ones that were tested.
+#
+# torch-index: https://download.pytorch.org/whl/cu128
+torch==2.11.0
+sentence-transformers==6.0.1
+transformers==5.16.1
+tokenizers==0.23.1
+safetensors==0.8.0
+huggingface_hub==1.29.0
+faiss-cpu==1.15.0
+numpy==2.5.2

@@ -1,0 +1,40 @@
+# The checks that need no archive, no model and no graphics card, on every push
+# and pull request. They are bin/ci.py, which anyone can run on a fresh clone;
+# this file only chooses the machines. What needs the real archive (serve.py
+# --selftest, index-query.py) cannot run here, and ci.py says so in its output.
+name: checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: ${{ matrix.os }}, Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows with Python 3.12 is what the README installs. --strict
+          # means nothing may be skipped, so the PQ checks must find numpy
+          # and faiss, pinned as requirements/node.txt pins them.
+          - { os: windows-latest, python: "3.12", full: true }
+          - { os: ubuntu-latest, python: "3.12", full: true }
+          # The oldest Python ark.py accepts (3.11, for tomllib). The
+          # standard-library checks only: the pinned numpy may not exist for it.
+          - { os: windows-latest, python: "3.11", full: false }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: numpy and faiss-cpu, as the node pins them
+        if: ${{ matrix.full }}
+        run: python -m pip install numpy==2.5.2 faiss-cpu==1.15.0
+      - name: bin/ci.py
+        run: python bin/ci.py ${{ matrix.full && '--strict' || '' }}

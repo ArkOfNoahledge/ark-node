@@ -1,0 +1,27 @@
+# The repository is the archive's skeleton: bin/ (the tools) and 13-ark-node/
+# (the node). A clone is meant to become an archive in place: `python bin/ark.py
+# fetch` downloads the shelves beside these two folders and `ark.py index` builds
+# 10-index/ there. None of that belongs in git.
+/0[1-9]-*/
+/10-index/
+/11-*/
+/12-*/
+/_incoming/
+
+# Machine-local: the Python environment and llama.cpp (ark.py's defaults are
+# <root>/.venv and <root>/llama), this machine's settings, and files the tools
+# generate per machine.
+/.venv/
+/llama/
+ark.toml
+library.xml
+fetch-substitutions.csv
+setup-report.txt
+MANIFEST.csv
+CHECKSUMS.sha256
+*.part
+*.bad
+*.building
+
+__pycache__/
+*.pyc
