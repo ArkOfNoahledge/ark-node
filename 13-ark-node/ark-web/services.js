@@ -50,6 +50,9 @@
     { id: 'library', group: 'archive', name: 'Library', href: at(P.archive, '/'),
       port: ':' + P.archive, icon: 'books', newTab: true, probe: at(P.archive, '/'),
       desc: 'Every book on the drive, page by page, in Kiwix, including the ones search does not reach.' },
+    { id: 'collections', group: 'archive', name: 'Collections', href: '/library/',
+      port: '/library/', icon: 'shelves', newTab: false,
+      desc: 'What the library holds: which collections answers can cite, which you can only browse, and how to add the rest.' },
     { id: 'map', group: 'archive', name: 'Map', href: '/map/',
       port: ':' + P.node + ' + :' + P.tiles, icon: 'map', newTab: true,
       probe: at(P.tiles, '/20260825/0/0/0.mvt'),
@@ -73,7 +76,8 @@
     map: '<path d="M4 8l8-3 10 3 8-3v21l-8 3-10-3-8 3z"/><path d="M12 5v21M22 8v21"/>',
     chat: '<path d="M5 7h24v15H14l-6 5v-5H5z"/><path d="M11 14h12"/>',
     chat2: '<path d="M5 7h24v15H14l-6 5v-5H5z"/><path d="M11 12h12M11 17h8"/>',
-    pulse: '<path d="M3 18h7l3-8 5 15 4-10 2 3h7"/>'
+    pulse: '<path d="M3 18h7l3-8 5 15 4-10 2 3h7"/>',
+    shelves: '<path d="M4 15h26M4 28h26"/><path d="M7 6v9M11 6v9M15 8v7M20 5l4 10M8 19v9M12 19v9M18 21v7M23 19v9M27 20v8"/>'
   };
   function icon(name, cls) {
     return '<svg class="' + (cls || 'ic') + '" viewBox="0 0 34 34" aria-hidden="true">'
@@ -119,6 +123,16 @@
         if (s.id === 'search') {
           return Promise.resolve(h ? { level: 'up', text: 'running' }
                                    : { level: 'down', text: 'not answering' });
+        }
+        /* THE LIBRARY'S OWN COUNTS (corpus.py via /api/health). Broken is the
+           only fault: not installed is a choice, browsable-only is a state. */
+        if (s.id === 'collections') {
+          var c = h && h.corpus;
+          if (!c || c.error) return Promise.resolve({ level: h ? 'warn' : 'down',
+            text: h ? 'unknown' : 'node not answering' });
+          return Promise.resolve(c.red
+            ? { level: 'warn', text: c.red + ' broken · ' + c.green + ' citable' }
+            : { level: 'up', text: c.green + ' citable · ' + c.amber + ' browsable' });
         }
         if (s.id === 'status') {
           if (!h) return Promise.resolve({ level: 'down', text: 'node not answering' });
@@ -181,5 +195,5 @@
   }
 
   window.ARK_SERVICES = { list: LIST, icon: icon, check: check, fixHosts: fixHosts,
-                          local: LOCAL, host: H };
+                          local: LOCAL, host: H, at: at, ports: P };
 })();

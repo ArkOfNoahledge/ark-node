@@ -86,6 +86,25 @@ a.tile:hover, a.tile:focus-visible { border-color:var(--sun); outline:none; }
 @media (max-width: 560px) { #status td:first-child { width:38%; } }
 #status .bad { color:var(--warn); }
 #status a { color:var(--day); }
+/* THE LIBRARY SECTION (2026-10-06). One tile per topic, coloured by the best
+   state of the collections in it: green means an answer can cite something on
+   the topic. Grey is "not installed", never red. */
+.libsum { display:flex; flex-wrap:wrap; gap:.5rem 1.2rem; font-family:var(--mono);
+          font-size:.78rem; color:var(--ink-soft); margin:0 0 .8rem; }
+.libsum span { display:inline-flex; gap:.4rem; align-items:center; }
+.libsum b { color:var(--ink); font-weight:600; }
+.topics { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:.5rem; }
+.topic { display:flex; gap:.5rem; align-items:flex-start; text-decoration:none; color:inherit;
+         background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+         padding:.55rem .7rem; }
+.topic:hover, .topic:focus-visible { border-color:var(--sun); outline:none; }
+.topic .dot { margin-top:.4rem; }
+.topic .tl { font-family:var(--disp); font-weight:700; font-size:.88rem; line-height:1.25; }
+.topic .tc { font-family:var(--mono); font-size:.66rem; color:var(--muted); }
+.topic.grey { opacity:.6; }
+.topic .brk, .libsum .bad { color:var(--warn); font-weight:600; }
+.libmore { font-family:var(--mono); font-size:.76rem; margin:.7rem 0 0; }
+.libmore a { color:var(--day); }
 footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(--mono);
          font-size:.7rem; color:var(--muted); }
 </style>
@@ -96,17 +115,23 @@ footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(-
   <a class="brand" href="/">ARK<span class="m">·</span>NODE</a>
   <span class="sp"></span>
   <a class="btn" href="/">Search</a>
+  <a class="btn" href="/library/">Collections</a>
   <button type="button" id="theme" title="light / dark">◐</button>
 </header>
 
 <main>
   <h1>What this node is serving</h1>
   <p class="lead">Everything running on this machine, in one place. The first three
-    answer from the archive and show the page they came from. The next two are the
-    models on their own. The last is the node's own health.</p>
+    answer from the archive and show the page they came from. Below them, what the
+    library holds. Then the models on their own, and the node's own health.</p>
 
   <div class="lab">From the archive · every answer has a source</div>
   <div class="grid" id="g-archive"></div>
+
+  <div class="lab" id="library">The library · what answers can cite</div>
+  <div class="libsum" id="lib-sum">Asking the node…</div>
+  <div class="topics" id="lib-topics"></div>
+  <p class="libmore"><a href="/library/">Every collection, what each holds, and how to add the rest &rarr;</a></p>
 
   <div class="lab w">The models alone · no archive, no citations</div>
   <p class="note">These talk to a model directly. Nothing is looked up, so an answer
@@ -163,7 +188,12 @@ footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(-
       + '</' + tag + '>';
   }
   var ga = '', gm = '';
-  S.list.forEach(function (s) { if (s.group === 'archive') ga += card(s); else gm += card(s); });
+  /* Collections has its own section below the cards; it is a card in the
+     Services menu only. */
+  S.list.forEach(function (s) {
+    if (s.id === 'collections') return;
+    if (s.group === 'archive') ga += card(s); else gm += card(s);
+  });
   document.getElementById('g-archive').innerHTML = ga;
   document.getElementById('g-model').innerHTML = gm;
 
@@ -220,6 +250,12 @@ footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(-
       + row('meaning search', dense, h.dense_attempted && !h.dense_search)
       + row('library', u.served ? n(u.served) + ' books served · ' + n(u.indexed) + ' in search'
                                 : esc(u.state || 'unknown'))
+      + row('collections', (h.corpus && !h.corpus.error)
+            ? n(h.corpus.green) + ' citable · ' + n(h.corpus.amber) + ' browsable only · '
+              + n(h.corpus.grey) + ' not installed · ' + n(h.corpus.red) + ' broken'
+              + ' · <a href="/library/">see them</a>'
+            : esc((h.corpus && h.corpus.error) || 'unknown'),
+            !!(h.corpus && (h.corpus.error || h.corpus.red)))
       + row(label('primary', 'Qwen', 'answers'), model('primary'), down('primary'))
       + row(label('crosscheck', 'Gemma', 'cross-check'), model('crosscheck'), down('crosscheck'))
       + row('gazetteer', sp.names ? n(sp.names) + ' place names'
@@ -235,8 +271,44 @@ footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(-
       + 'Same source as <code>python bin/ark.py status</code>.</p>';
   }
 
+  /* THE LIBRARY SECTION. Its own fetch, once a minute: the collections change
+     when someone fetches or indexes, not every ten seconds. */
+  var LV = { green: 'up', amber: 'warn', red: 'down', grey: 'off' };
+  var WORD = { green: 'citable', amber: 'browsable only', red: 'broken', grey: 'not installed' };
+  function library() {
+    fetch('/api/corpus', { cache: 'no-store' }).then(function (r) { return r.json(); })
+      .then(function (c) {
+        var sm = c.summary || {};
+        document.getElementById('lib-sum').innerHTML = ['green', 'amber', 'red', 'grey']
+          .map(function (k) {
+            return '<span><i class="dot ' + LV[k] + '"></i><b>' + n(sm[k] || 0) + '</b> '
+              + WORD[k] + '</span>';
+          }).join('');
+        document.getElementById('lib-topics').innerHTML = (c.topics || [])
+          .filter(function (t) { return t.total; })
+          .map(function (t) {
+            var k = t.counts || {};
+            var bits = [];
+            if (k.green) bits.push(k.green + ' citable');
+            if (k.amber) bits.push(k.amber + ' browsable');
+            if (k.red) bits.push('<b class="brk">' + k.red + ' broken</b>');
+            if (k.grey) bits.push(k.grey + ' not installed');
+            return '<a class="topic ' + t.state + '" href="/library/#' + esc(t.id) + '">'
+              + '<i class="dot ' + LV[t.state] + '"></i><span><span class="tl">'
+              + esc(t.label_en) + '</span><br><span class="tc">' + bits.join(' · ')
+              + '</span></span></a>';
+          }).join('');
+      }).catch(function () {
+        document.getElementById('lib-sum').innerHTML =
+          '<span class="bad">The node did not answer <code>/api/corpus</code>.</span>';
+      });
+  }
+  library();
+  setInterval(library, 60000);
+
   function paint(r) {
     S.list.forEach(function (s) {
+      if (!document.getElementById('dot-' + s.id)) return;
       var st = r.state[s.id];
       document.getElementById('dot-' + s.id).className = 'dot ' + st.level;
       document.getElementById('s-' + s.id).textContent = st.text;

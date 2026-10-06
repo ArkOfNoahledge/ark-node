@@ -61,6 +61,7 @@ import safety                                                  # noqa: E402
 import llm                                                     # noqa: E402
 import answer as answerlib                                     # noqa: E402
 import spatial                                                 # noqa: E402
+import corpus as corpuslib                                     # noqa: E402
 import threading                                               # noqa: E402
 import uuid                                                    # noqa: E402
 import importlib.util                                          # noqa: E402
@@ -140,6 +141,76 @@ def kit_faults(models, gazetteer_ok, gazetteer_error, off=None):
 # exactly as before.
 DEFAULT_PORTS = {"archive": 8080, "tiles": 8081, "node": 8090,
                  "primary": 8091, "crosscheck": 8092}
+
+
+# THE CORPUS VIEW (2026-10-06, PLAN-corpus-status.md). What the library holds,
+# what answers can cite, and what could be added: corpus.py does the work, this
+# keeps one copy and refreshes it. Thirty seconds, or at once when library.xml
+# changes, because a fetch or a library rebuild while the node runs should show
+# within a page refresh, and 107 stat calls plus one XML parse is cheap but not
+# free on every health poll from every open tab.
+CORPUS_TTL = 30.0
+_CORPUS = {"at": 0.0, "key": None, "view": None}
+_CORPUS_LOCK = threading.Lock()
+
+
+def _library_path():
+    """The library kiwix-serve was confirmed against, else <archive>/library.xml."""
+    lib = getattr(S, "books_library", None) if S is not None else None
+    if lib and os.path.exists(lib):
+        return lib
+    return os.path.join(store.ROOT, "library.xml")
+
+
+def corpus_view(force=False):
+    """corpus.status() for this node, cached. Works with no index at all (a
+    clone before setup, or --unit): every row is then grey or amber."""
+    lib = _library_path()
+    try:
+        key = os.path.getmtime(lib)
+    except OSError:
+        key = None
+    with _CORPUS_LOCK:
+        c = _CORPUS
+        if (not force and c["view"] is not None and c["key"] == key
+                and time.time() - c["at"] < CORPUS_TTL):
+            return c["view"]
+        arts = list(S.artifacts.values()) if S is not None else []
+        v = corpuslib.status(store.ROOT, corpuslib.load_csv(corpuslib.CATALOG),
+                             corpuslib.load_csv(corpuslib.TOPICS_CSV), arts,
+                             corpuslib.library_books(lib))
+        c.update(at=time.time(), key=key, view=v)
+        return v
+
+
+def suggestion_for(q, grounding_state, n_results):
+    """The "not in your library yet" card for an answer, or None.
+
+    ONLY WHEN THE LIBRARY DID NOT GROUND THE ANSWER (corpus.SUGGEST_WHEN), or
+    found nothing at all. Never for a grounded answer: offering a download
+    beside cited passages would read as doubt they do not deserve. Shown beside
+    the answer and never inside it, so the grounding badge keeps one meaning;
+    and it says "may cover", never "contains". A failure here is reported in
+    the payload and never breaks the answer."""
+    if not corpuslib.wants_suggestion(grounding_state, n_results):
+        return None
+    try:
+        out = corpuslib.suggest(q, corpus_view())
+    except Exception as e:                       # noqa: BLE001 - reported
+        return {"error": "%s: %s" % (type(e).__name__, e), "items": []}
+    if not out["items"]:
+        return None
+    out["why"] = grounding_state or "no_results"
+    return out
+
+
+def corpus_summary():
+    """The four counts for /api/health, or the reason there are none. A broken
+    topics file must never take the health report down with it."""
+    try:
+        return dict(corpus_view()["summary"])
+    except Exception as e:                       # noqa: BLE001 - reported
+        return {"error": "%s: %s" % (type(e).__name__, e)}
 
 
 def _port_of(url, default):
@@ -799,6 +870,9 @@ def do_answer(q, n, mode, prev_qs=None):
     if sp["intent"]:
         out["spatial"] = sp
 
+    # WITH NO MODEL THERE IS NO GROUNDING TO JUDGE, so a suggestion is made
+    # only when retrieval itself found nothing: the one case where "the library
+    # does not hold this" is known without a model.
     if not llm.available("primary"):
         # THE SOURCE PANE STILL WORKS AND THE PAYLOAD SAYS SO EXPLICITLY.
         # Silence here would teach the operator that no answer means the archive
@@ -807,6 +881,9 @@ def do_answer(q, n, mode, prev_qs=None):
         out["model_down"] = ("The primary model is not running. Retrieval is "
                              "unaffected - the passages below were found without "
                              "any model.")
+        sg = suggestion_for(q, None, len(results))
+        if sg:
+            out["suggest"] = sg
         return out
 
     try:
@@ -814,9 +891,15 @@ def do_answer(q, n, mode, prev_qs=None):
     except llm.LLMUnavailable as e:
         out["answer"] = None
         out["model_down"] = e.detail
+        sg = suggestion_for(q, None, len(results))
+        if sg:
+            out["suggest"] = sg
         return out
 
     out["answer"] = a
+    sg = suggestion_for(q, a.get("grounding"), len(results))
+    if sg:
+        out["suggest"] = sg
     sf = a["safety"]
     unsourced = a["grounding"] in ("unsourced", "grounded_plus")
     # THE TWO ARE NOT THE SAME SITUATION even though both force the check.
@@ -905,6 +988,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
             # type a question. This is one click away from it, in the header.
             if u.path in ("/home", "/home/"):
                 return self._file(os.path.join(WEB, "home.html"))
+            # WHAT THE LIBRARY HOLDS (2026-10-06): every corpus, whether answers
+            # can cite it, and how to add or repair the rest.
+            if u.path in ("/library", "/library/"):
+                return self._file(os.path.join(WEB, "library.html"))
+            if u.path == "/api/corpus":
+                out = corpuslib.public(corpus_view(
+                    force=(qs.get("refresh") or [""])[0] == "1"))
+                out["topic_list"] = [{"id": t[0], "label_en": t[1], "label_es": t[2]}
+                                     for t in corpuslib.TOPICS]
+                out["computed_seconds_ago"] = round(time.time() - _CORPUS["at"], 1)
+                return self._send(200, out)
             if u.path == "/api/ports.js":
                 return self._send(200, ports_js(),
                                   ctype="application/javascript; charset=utf-8",
@@ -950,6 +1044,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     "spatial": spatial.status(),
                     "models": models_view(llm.status()),
                     "not_installed": sorted(NOT_INSTALLED),
+                    # Counts only; the rows are /api/corpus.
+                    "corpus": corpus_summary(),
                     "dense_error": S.dense_error(),
                     # NOT LOADED YET IS NOT DEGRADED. Dense retrieval is lazy, so
                     # every node reported it for the first minute of its life and
@@ -1264,6 +1360,40 @@ def ports_selftest():
         else:
             bad += 1
             print("  FAIL  ports  %-30s %s" % (name, detail))
+    return bad
+
+
+def corpus_route_selftest():
+    """The node's corpus view with no index loaded: what a clone shows before
+    setup. Nothing may be red on an empty drive, and the health summary must
+    carry the four counts."""
+    bad = 0
+    v = corpus_view(force=True)
+    summ = corpus_summary()
+    for name, got, want in [
+            ("the view is built with no index", isinstance(v.get("rows"), list), True),
+            ("the health summary has the four states",
+             sorted(k for k in summ if k in corpuslib.STATES), sorted(corpuslib.STATES)),
+            ("the library page is a file in ark-web",
+             os.path.isfile(os.path.join(WEB, "library.html")), True),
+            ("the public view carries no matcher internals",
+             any(k.startswith("_") for r in corpuslib.public(v)["rows"] for k in r), False),
+            ("a grounded answer gets no suggestion",
+             suggestion_for("How do I make water safe with chlorine?", "grounded", 5), None),
+            # ON ANY NODE: either water is already citable here (no card), or
+            # the card offers a water collection. Never something unrelated.
+            ("an unsourced water question is offered water, or nothing",
+             (lambda sg: sg is None or any("water" in i["id"] for i in sg["items"]))(
+                 suggestion_for("How do I make water safe with chlorine?", "unsourced", 5)),
+             True),
+            ("a suggestion says why it was made",
+             (suggestion_for("Qwrtz vbnmk?", "unsourced", 5) or {"why": "unsourced"}).get("why"),
+             "unsourced")]:
+        if got == want:
+            print("  ok    route  %s" % name)
+        else:
+            bad += 1
+            print("  FAIL  route  %s: got %r" % (name, got))
     return bad
 
 
@@ -2000,7 +2130,8 @@ def main():
     # provenance and keyword stores below; these three do not, so they can run
     # on every commit (2026-10-04).
     if args.unit:
-        bad = llm.selftest() + ports_selftest() + kit_selftest()
+        bad = (llm.selftest() + ports_selftest() + kit_selftest()
+               + corpuslib.selftest() + corpus_route_selftest())
         print("\n%s" % ("UNIT CHECKS FAILED: %d problem(s)" % bad if bad
                         else "unit checks passed"))
         sys.exit(1 if bad else 0)

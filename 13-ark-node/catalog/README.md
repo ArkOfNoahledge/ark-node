@@ -104,3 +104,24 @@ CC BY-SA; the model weights are Apache-2.0 or MIT). Some of it is not:
   or not yet known.
 
 Nothing here is legal advice.
+
+## topics.csv: what each corpus is about
+
+**Written by hand**, unlike catalog.csv. One row per corpus (every ZIM, PDF and
+folder on shelves 02 to 08 of the catalog). The node reads it for two things:
+the Library section and `/library` page, which group the corpora by topic, and
+the "not in your library yet" suggestion shown when an answer cannot be
+grounded, which matches the question against the keywords.
+
+| column | meaning |
+|---|---|
+| `id` | the catalog id |
+| `topics` | from the fixed list in `ark-api/corpus.py`, separated by `\|` |
+| `lang` | `en`, `es` or `mul` |
+| `suggest` | `no` for data that is not text to search (climate rasters, a bibliographic catalogue): listed, never suggested |
+| `keywords_en`, `keywords_es` | words and short phrases a question about this corpus would contain, separated by `\|`; accents and case do not matter |
+| `blurb_en`, `blurb_es` | one line: what is in it |
+
+`python 13-ark-node/ark-api/corpus.py --selftest` fails when the two files name
+different corpora or a row uses a topic the list does not have, and it checks a
+set of sample questions against the keywords. Change a keyword, run it.

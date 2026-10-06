@@ -174,9 +174,15 @@ def zim_artifacts():
     return out
 
 
+# 08-maps SINCE 2026-10-06. It holds two ZIMs (the GIS Stack Exchange and the
+# OpenStreetMap wiki) that were on the drive and never served: the corpus view
+# (corpus.py) drew them red on its first run against this archive, which is the
+# 686 GB mistake above in a smaller place. Only .zim files are read, so the
+# shelf's map tiles are untouched.
 CORPUS_SHELVES = ("02-corpora-core", "03-corpora-economics",
                   "04-corpora-mathematics", "05-corpora-language",
-                  "06-corpora-literature", "07-corpora-supplemental")
+                  "06-corpora-literature", "07-corpora-supplemental",
+                  "08-maps")
 
 
 def all_zims():

@@ -39,6 +39,11 @@ hardware design and the full catalog are at
    reference archive: 2.4 TB, 39 million indexed passages, served from a laptop.
 7. **Built to last.** Checksums for every file, a catalog pinned to exact
    versions, and recovery steps written to be followed from paper.
+8. **It knows what it holds, and what it does not.** A *Collections* page shows
+   every collection in the catalog as citable, browsable only, not installed or
+   broken, with the command that changes it. When an answer cannot be grounded,
+   the node names collections that may cover the question. It never downloads
+   anything by itself.
 
 ![A second model family reads the same passages, and the node compares the two answers](docs/images/check.webp)
 
@@ -139,8 +144,9 @@ python bin\ark.py selftest                          the tools' own tests; needs 
 python bin\ci.py                                    every check CI runs; needs no archive
 ```
 
-More content is indexed with `bin\index-build.py` and a scope file, then made
-searchable with `python bin\ark.py index`.
+`http://localhost:8090/library/` lists every collection and its state. To make
+one that is on the drive citable, stop the node and run
+`python bin\ark.py index --add ID` (it uses the graphics card), then start it again.
 [`13-ark-node/README.md`](13-ark-node/README.md) describes how the node works and
 why, and [`13-ark-node/RECOVERY.md`](13-ark-node/RECOVERY.md) is the recovery
 procedure.

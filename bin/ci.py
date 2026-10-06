@@ -51,6 +51,7 @@ CHECKS = [
     ("llm cancellation", API, ["llm.py", "--selftest"], ()),
     ("answer assembly", API, ["answer.py", "--selftest"], ()),
     ("store filters", API, ["store.py", "--selftest"], ()),
+    ("corpus status and suggestions", API, ["corpus.py", "--selftest"], ()),
     ("serve, no index", API, ["serve.py", "--unit"], ()),
     ("pq build", ROOT, ["bin/index-pq-build.py", "--selftest"], ("numpy", "faiss")),
     ("pq probe", ROOT, ["bin/index-pq-probe.py", "--selftest"], ("numpy", "faiss")),
@@ -91,7 +92,7 @@ def check_pages(node):
     tmp = tempfile.mkdtemp(prefix="ark-ci-")
     try:
         files = [(os.path.join(WEB, "services.js"), None)]
-        for page in ("index.html", "home.html"):
+        for page in ("index.html", "home.html", "library.html"):
             with open(os.path.join(WEB, page), encoding="utf-8") as fh:
                 for i, js in enumerate(re.findall(r"<script>(.*?)</script>",
                                                   fh.read(), re.S)):

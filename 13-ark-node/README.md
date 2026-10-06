@@ -351,6 +351,37 @@ exists.
 
 ---
 
+## What the library holds, and what to do when it does not hold the answer
+
+Added 2026-10-06 (`ark-api/corpus.py`, `catalog/topics.csv`, `ark-web/library.html`).
+
+Every corpus row of the catalog (a ZIM, PDF or folder on shelves 02 to 08) is in
+one of four states, worked out from file names and sizes and never by hashing:
+**green**, on the drive and in the index, so answers search and cite it;
+**amber**, on the drive and not indexed, browsable in Kiwix only; **grey**, not
+installed, which is not a fault (a starter kit leaves about a hundred out on
+purpose); **red**, something expects it and it is not usable (in the index but
+gone from the drive, on the drive but not served, or the wrong size). Every row
+says why, and every row that can change says how. An indexed artifact no catalog
+row covers is listed too, as added on this node.
+
+**When an answer is not grounded** (unsourced, uncovered or model-only) or
+nothing was found, `/api/answer` carries `suggest`: up to three collections that
+are not already searchable and may cover the question, with their commands. The
+match uses `topics.csv`, hand-written, with at least fifty English and fifty
+Spanish keywords a collection: real word endings only, words weighted by how few
+collections claim them, Spanish keywords read only for a Spanish question, and
+nothing offered below the score of a citable collection that already matches the
+question well (the topic is covered; the miss is retrieval's). When nothing
+matches, the encyclopedia in the question's language is offered and labelled as
+a fallback. It needs no model and no index. **It never appears on a grounded
+answer, never inside the answer, and never says a collection contains the
+answer.** The node never downloads; it shows the command.
+
+`python bin/ark.py index --add ID` takes an amber collection to citable: it
+appends the path to `10-index/scope-local.txt`, builds that one artifact and runs
+the usual index steps. It refuses while the primary model holds the graphics card.
+
 ## Layout
 
     13-ark-node/
@@ -407,6 +438,8 @@ deliberately outside the repository.
 | `GET /files/<archive path>` | the four PDF artifacts nothing else serves |
 | `GET /map/` | the map viewer, served out of `09-software/map-viewer` so there is no fourth server |
 | `GET /home/` | every service on the node, one card each, with whether **this browser** can reach it. Also the *Services* menu in the search page's header (2026-09-27) |
+| `GET /library/` | every collection in the catalog, citable / browsable only / not installed / broken, each with its reason and the command that changes it (2026-10-06) |
+| `GET /api/corpus` | the same as data: rows, a summary by state, one line per topic. Cached 30 s or until `library.xml` changes; `?refresh=1` forces it. `/api/health` carries the summary as `corpus` |
 
 ## Starting it
 

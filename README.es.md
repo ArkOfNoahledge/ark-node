@@ -41,6 +41,11 @@ en **[arkofnoahledge.org](https://arkofnoahledge.org/es/)**.
 7. **Hecho para durar.** Sumas de verificación para cada archivo, un catálogo
    fijado a versiones exactas, y pasos de recuperación escritos para seguirse
    desde papel.
+8. **Sabe lo que tiene, y lo que no.** Una página *Collections* muestra cada
+   colección del catálogo como citable, solo para leer, no instalada o dañada,
+   con el comando que lo cambia. Cuando una respuesta no tiene fuente, el nodo
+   nombra colecciones que quizá cubran la pregunta. Nunca descarga nada por su
+   cuenta.
 
 ![Una segunda familia de modelos lee los mismos pasajes, y el nodo compara las dos respuestas](docs/images/check.webp)
 
@@ -142,8 +147,9 @@ python bin\ark.py selftest                          las pruebas de las herramien
 python bin\ci.py                                    todo lo que corre la CI; no necesita el archivo
 ```
 
-Más contenido se indexa con `bin\index-build.py` y un archivo de alcance, y se
-vuelve buscable con `python bin\ark.py index`.
+`http://localhost:8090/library/` lista cada colección y su estado. Para que una
+que ya está en el disco sea citable, detén el nodo y ejecuta
+`python bin\ark.py index --add ID` (usa la tarjeta gráfica), y vuelve a arrancarlo.
 [`13-ark-node/README.md`](13-ark-node/README.md) describe cómo funciona el nodo y
 por qué, y [`13-ark-node/RECOVERY.md`](13-ark-node/RECOVERY.md) es el procedimiento
 de recuperación (ambos en inglés).

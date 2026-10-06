@@ -3334,9 +3334,99 @@ def index_run(ix, force=(), no_rehash=False, node_up=False, states=None,
     return 0, done
 
 
+# INDEX --ADD, 2026-10-06. One collection from "on the drive" to "citable" in one
+# command, because the corpus view (corpus.py, /library/) found that the honest
+# way to say it was three: append the path to a scope file, run index-build.py
+# --artifact against that scope, then `ark.py index`. The first of the three was
+# an `echo ... >> file` that means different things in cmd, PowerShell (which
+# appends UTF-16) and Git Bash (which eats the backslashes), so it is done here.
+#
+# THE SCOPE FILE IS 10-index/scope-local.txt, beside setup's scope-starter.txt:
+# it describes this node's index, so it lives with it, and never in bin/, whose
+# manifest is the project's. Written UTF-8, LF, one path per line, idempotent.
+
+def corpus_row(rows, rid):
+    """The catalog row a collection id names, if it is one that can be indexed."""
+    for r in rows:
+        if r.get("id") == rid:
+            if r.get("kind") not in ("zim", "pdf", "folder"):
+                return None, "%s is a %s, not a collection" % (rid, r.get("kind"))
+            return r, ""
+    return None, "no catalog row has the id %r (python bin/ark.py fetch --list)" % rid
+
+
+def scope_add(path, line):
+    """Append `line` to a scope file unless it is already there. True if added."""
+    have = []
+    if os.path.isfile(path):
+        with open(path, encoding="utf-8") as fh:
+            have = [x.split("#", 1)[0].strip() for x in fh]
+    if line in have:
+        return False
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    new = not os.path.isfile(path)
+    with open(path, "a", encoding="utf-8", newline="\n") as fh:
+        if new:
+            fh.write("# Collections added to this node's index by `ark.py index --add`.\n"
+                     "# One path per line, relative to the archive. Read by\n"
+                     "# index-build.py --scope <this file> --artifact <name>.\n")
+        fh.write(line + "\n")
+    return True
+
+
+def index_add(args, ix, py):
+    """Index one collection, then fall through to the usual steps. Returns an
+    exit code to stop with, or None to carry on into the steps."""
+    try:
+        rows = load_catalog(CFG["paths.catalog"])
+    except FileNotFoundError as e:
+        print("\n  %s\n" % e)
+        return 2
+    r, why = corpus_row(rows, args.add)
+    if not r:
+        print("\n  %s\n" % why)
+        return 2
+    dest = fetch_dest(r, ROOT)
+    rel = "%s/%s" % (r["shelf"].strip("/"), r["file"].strip("/"))
+    if r["kind"] == "folder":
+        rel += "/"
+    if not os.path.exists(dest):
+        print("\n  %s is not on this drive (%s).\n  Get it first: python bin/ark.py fetch %s\n"
+              % (args.add, dest, args.add))
+        return 2
+    scope = os.path.join(ix, "scope-local.txt")
+    name = r["file"].rstrip("/").split("/")[-1]
+    build = [py, os.path.join(ROOT, "bin", "index-build.py"), "--scope", scope,
+             "--artifact", name, "--resume"]
+    print("\n  add       %s\n  path      %s\n  scope     %s\n  build     %s\n"
+          % (args.add, rel, scope, " ".join(build)))
+    if args.plan:
+        print("  plan only; nothing was written or run.\n")
+        return 0
+    # THE PRIMARY AND THE EMBEDDING MODEL DO NOT FIT ON A 16 GB CARD TOGETHER
+    # (13-ark-node/README.md). Refused here rather than discovered as an
+    # out-of-memory error an hour into the build.
+    if listening(CFG["ports.primary"]) and not args.with_models:
+        print("  The primary model is running, and indexing needs the graphics card.\n"
+              "  Stop the node first, then run this again:\n"
+              "    python bin/ark.py down\n"
+              "  (--with-models runs it anyway, on a card with room for both.)\n")
+        return 3
+    print("  scope     %s" % ("added" if scope_add(scope, rel) else "already listed"))
+    code = subprocess.call(build, cwd=ROOT)
+    if code:
+        print("\n  index-build.py stopped (exit %d). Nothing after it was run.\n" % code)
+        return code
+    return None
+
+
 def do_index(args):
     ix = os.path.join(ROOT, "10-index")
     py = node_python()[0]
+    if getattr(args, "add", None):
+        code = index_add(args, ix, py)
+        if code is not None:
+            return code
     force = set()
     for f in (args.force or "").split(","):
         f = f.strip()
@@ -5591,9 +5681,26 @@ def do_selftest(args):
     selftest_profiles(check)
     selftest_rehash(check)
     selftest_setup(check)
+    selftest_index_add(check)
     total = _CHECKS[0]
     print("\n%d/%d" % (total - bad, total))
     return 1 if bad else 0
+
+
+def selftest_index_add(check):
+    """index --add: the row it accepts, and a scope file written once."""
+    import tempfile
+    rows = [{"id": "z", "kind": "zim"}, {"id": "m", "kind": "gguf"}]
+    check("index --add finds a collection row", corpus_row(rows, "z")[0] is rows[0])
+    check("index --add refuses a model row", corpus_row(rows, "m")[0] is None)
+    check("index --add refuses an unknown id", corpus_row(rows, "q")[0] is None)
+    d = tempfile.mkdtemp()
+    sp = os.path.join(d, "10-index", "scope-local.txt")
+    first, again = scope_add(sp, "07-x/a.zim"), scope_add(sp, "07-x/a.zim")
+    with open(sp, encoding="utf-8") as fh:
+        body = fh.read()
+    check("index --add writes the path once", (first, again, body.count("07-x/a.zim")) == (True, False, 1))
+    check("index --add writes UTF-8 with LF", "\r" not in body and body.startswith("# Collections"))
 
 
 DESCRIPTION = """ark.py - start the node's servers, say what is running, and stop them.
@@ -5716,6 +5823,11 @@ def main():
                                     "pq,bm25,provenance,mirror,rehash")
     ix.add_argument("--no-rehash", action="store_true",
                     help="leave the 10-index rehash for later (it reads the whole shelf)")
+    ix.add_argument("--add", metavar="ID",
+                    help="index this collection first (a catalog id that is on the "
+                         "drive), then run the steps; uses the graphics card")
+    ix.add_argument("--with-models", action="store_true",
+                    help="with --add: build even while the primary model is running")
     cf = sub.add_parser("config", help="every setting, its value, and whether it "
                                        "came from the environment, ark.toml or "
                                        "the default")

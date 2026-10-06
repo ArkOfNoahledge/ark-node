@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ark of Noahledge — collections</title>
+<!--
+  WHAT THE LIBRARY HOLDS, 2026-10-06 (PLAN-corpus-status.md). Every collection in
+  the catalog, in one of four states, each with the reason and, where something
+  can be done, the command that does it:
+
+    citable          on the drive and in the index: answers search and cite it
+    browsable only   on the drive, not indexed: open it in Kiwix, answers cannot
+                     cite it
+    broken           something expects it and it is not usable
+    not installed    not on this drive. NOT A FAULT: a starter kit leaves about
+                     a hundred collections out on purpose
+
+  THE NODE NEVER DOWNLOADS ANYTHING ITSELF (Juan, 2026-10-06). This page shows
+  the command; the operator runs it, on purpose, when there is internet.
+
+  No framework, no build step, no external request. Palette and type from
+  index.html and home.html.
+-->
+<style>
+:root {
+  --ground:#15120D; --surface:#252119; --surface-2:#1D1912;
+  --ink:#E6DFD0; --ink-soft:#C1BAAC; --muted:#938B7D;
+  --rule:#3A352A; --rule-soft:#2A251D;
+  --sun:#E69C3B; --day:#6AA7F4; --warn:#EF7F72; --good:#62BB78;
+  --mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --body: "Newsreader", Georgia, "Times New Roman", serif;
+  --disp: "Archivo", "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-theme="light"] {
+  --ground:#ECE6DC; --surface:#F9F6F1; --surface-2:#F4F0E8;
+  --ink:#17140F; --ink-soft:#433E34; --muted:#6A6459;
+  --rule:#D2CBBE; --rule-soft:#E4DFD5;
+  --sun:#985800; --day:#135298; --warn:#902822; --good:#006527;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--ground); color:var(--ink); font-family:var(--body);
+       font-size:16px; line-height:1.5; }
+header { position:sticky; top:0; z-index:5; background:var(--ground);
+         border-bottom:1px solid var(--rule); padding:.6rem 1rem;
+         display:flex; gap:.75rem; align-items:center; }
+.brand { font-family:var(--disp); font-weight:800; letter-spacing:-.02em;
+         font-size:1rem; white-space:nowrap; color:var(--ink); text-decoration:none; }
+.brand .m { color:var(--sun); }
+.sp { flex:1; }
+button, .btn, select, input { background:var(--surface); color:var(--ink); border:1px solid var(--rule);
+  border-radius:3px; padding:.45rem .6rem; font-family:var(--mono); font-size:.78rem; }
+button, .btn { cursor:pointer; text-decoration:none; }
+button:hover, .btn:hover { border-color:var(--sun); color:var(--sun); }
+main { max-width:1040px; margin:0 auto; padding:1.6rem 1rem 2rem; }
+h1 { font-family:var(--disp); font-size:1.5rem; margin:0 0 .2rem; letter-spacing:-.01em; }
+.lead { color:var(--ink-soft); margin:0 0 .9rem; max-width:68ch; }
+.dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; display:inline-block; }
+.dot.green { background:var(--good); } .dot.amber { background:var(--sun); }
+.dot.red { background:var(--warn); } .dot.grey { background:var(--muted); }
+.legend { display:grid; grid-template-columns:repeat(4, 1fr); gap:.5rem; margin:0 0 1rem; }
+@media (max-width: 760px) { .legend { grid-template-columns:1fr 1fr; } }
+.legend div { background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+              padding:.55rem .7rem; font-size:.86rem; color:var(--ink-soft); }
+.legend b { font-family:var(--disp); color:var(--ink); display:flex; gap:.45rem; align-items:center;
+            font-size:.92rem; }
+.legend .n { font-family:var(--mono); font-weight:600; margin-left:auto; }
+.controls { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; margin:0 0 1rem;
+            position:sticky; top:3.05rem; background:var(--ground); padding:.5rem 0; z-index:4;
+            border-bottom:1px solid var(--rule-soft); }
+.controls input { flex:1; min-width:12rem; }
+@media (max-width: 560px) {
+  .controls { position:static; }
+  .meta { margin-left:1.1rem; }
+  .act .lbl { min-width:0; flex-basis:100%; }
+}
+.states button.on { border-color:var(--sun); color:var(--sun); }
+.group { font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+         color:var(--muted); margin:1.4rem 0 .5rem; }
+.group.red { color:var(--warn); }
+.row { background:var(--surface); border:1px solid var(--rule); border-radius:4px;
+       padding:.8rem .9rem; margin:0 0 .5rem; }
+.row.grey { background:var(--surface-2); }
+.row.red { border-color:var(--warn); }
+.top { display:flex; gap:.3rem .8rem; align-items:baseline; flex-wrap:wrap; }
+.tw { display:flex; gap:.6rem; align-items:baseline; min-width:0; flex:1 1 20rem; }
+.tw .dot { position:relative; top:-1px; }
+.tt { font-family:var(--disp); font-weight:700; font-size:1rem; }
+.meta { margin-left:auto; font-family:var(--mono); font-size:.7rem; color:var(--muted); white-space:nowrap; }
+.blurb { color:var(--ink-soft); font-size:.92rem; margin:.25rem 0 0; }
+.why { font-family:var(--mono); font-size:.74rem; color:var(--muted); margin:.4rem 0 0; }
+.row.red .why { color:var(--warn); }
+.chips { margin:.4rem 0 0; display:flex; flex-wrap:wrap; gap:.3rem; }
+.chip { font-family:var(--mono); font-size:.64rem; color:var(--muted); border:1px solid var(--rule);
+        border-radius:999px; padding:.05rem .45rem; text-decoration:none; }
+a.chip:hover { color:var(--sun); border-color:var(--sun); }
+.acts { margin:.6rem 0 0; border-top:1px solid var(--rule-soft); padding-top:.5rem; }
+.act { display:flex; flex-wrap:wrap; gap:.4rem .6rem; align-items:center; margin:.25rem 0;
+       font-size:.82rem; color:var(--ink-soft); }
+.act .lbl { min-width:14rem; }
+.act code { font-family:var(--mono); font-size:.76rem; background:var(--ground); color:var(--ink);
+            border:1px solid var(--rule-soft); border-radius:3px; padding:.2rem .45rem;
+            overflow-wrap:anywhere; }
+.act button { padding:.2rem .5rem; font-size:.7rem; }
+.act a, .browse { color:var(--day); font-family:var(--mono); font-size:.76rem; }
+.browse { display:inline-block; margin:.5rem 0 0; }
+.lic { font-family:var(--mono); font-size:.68rem; color:var(--muted); margin:.35rem 0 0; }
+.empty { color:var(--muted); font-style:italic; }
+.note { font-size:.86rem; color:var(--ink-soft); border-left:2px solid var(--sun);
+        padding:.2rem .7rem; margin:0 0 1rem; max-width:76ch; }
+footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(--mono);
+         font-size:.7rem; color:var(--muted); }
+footer a { color:var(--day); }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="/">ARK<span class="m">·</span>NODE</a>
+  <span class="sp"></span>
+  <a class="btn" href="/">Search</a>
+  <a class="btn" href="/home/">Home</a>
+  <button type="button" id="theme" title="light / dark">◐</button>
+</header>
+
+<main>
+  <h1>What the library holds</h1>
+  <p class="lead">Every collection this node knows about: which ones an answer can
+    cite, which you can only browse, and which are not on this drive yet. Each one
+    says why it is in its state, and what to do if you want to change that.</p>
+
+  <div class="legend" id="legend"></div>
+
+  <p class="note">This node never downloads anything by itself. To add a
+    collection, run the command shown on its card on this computer, at a time when
+    it has internet. A download is browsable as soon as it finishes; answers can
+    cite it only after it is indexed, which uses the graphics card and takes from
+    minutes to many hours depending on its size.</p>
+
+  <div class="controls">
+    <select id="f-topic" aria-label="Topic"><option value="">All topics</option></select>
+    <span class="states" id="f-state">
+      <button type="button" data-s="" class="on">All</button>
+      <button type="button" data-s="green">Citable</button>
+      <button type="button" data-s="amber">Browsable</button>
+      <button type="button" data-s="red">Broken</button>
+      <button type="button" data-s="grey">Not installed</button>
+    </span>
+    <select id="f-lang" aria-label="Language">
+      <option value="">Any language</option>
+      <option value="en">English</option>
+      <option value="es">Spanish</option>
+      <option value="mul">Several</option>
+    </select>
+    <input id="f-text" type="search" placeholder="Filter by name or subject" aria-label="Filter">
+  </div>
+
+  <div id="list">Asking the node…</div>
+</main>
+
+<footer id="foot">checking…</footer>
+
+<script src="/api/ports.js"></script>
+<script src="/web/services.js"></script>
+<script>
+(function () {
+  'use strict';
+  var S = window.ARK_SERVICES || null;
+  document.getElementById('theme').addEventListener('click', function () {
+    var r = document.documentElement;
+    r.setAttribute('data-theme', r.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+  });
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function n(x) { return (x == null) ? '?' : Number(x).toLocaleString(); }
+  function size(b) {
+    if (!b) return '';
+    if (b >= 1e12) return (b / 1e12).toFixed(1) + ' TB';
+    if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB';
+    if (b >= 1e6) return Math.round(b / 1e6) + ' MB';
+    return Math.max(1, Math.round(b / 1e3)) + ' KB';
+  }
+  var ORDER = ['red', 'green', 'amber', 'grey'];
+  var WORD = { green: 'Citable', amber: 'Browsable only', red: 'Broken', grey: 'Not installed' };
+  var MEANS = {
+    green: 'On the drive and indexed. Answers search it and cite it.',
+    amber: 'On the drive, not indexed. Open it in the library; answers cannot cite it.',
+    red: 'Something expects it and it is not usable. The card says what and how to fix it.',
+    grey: 'Not on this drive. Not a fault: add it when you want it.'
+  };
+  var GROUP = { red: 'Broken · fix these first', green: 'Citable',
+                amber: 'Browsable only · not indexed', grey: 'Not installed' };
+  var LANG = { en: 'English', es: 'Spanish', mul: 'several languages' };
+  var KIND = { zim: 'ZIM', pdf: 'PDF', folder: 'folder' };
+  var SHARE = { no: 'may not be shared onward', 'non-commercial': 'non-commercial use only',
+                'per-item': 'licence varies by item', ask: 'rights unclear: ask the publisher' };
+
+  var DATA = null, TOPIC = {}, F = { topic: '', state: '', lang: '', text: '' };
+
+  function legend(sm) {
+    document.getElementById('legend').innerHTML = ORDER.map(function (k) {
+      return '<div><b><i class="dot ' + k + '"></i>' + WORD[k] + '<span class="n">'
+        + n(sm[k] || 0) + '</span></b>' + MEANS[k] + '</div>';
+    }).join('');
+  }
+
+  function browseUrl(stem) {
+    if (S && S.at && S.ports) return S.at(S.ports.archive, '/content/' + encodeURIComponent(stem));
+    return location.protocol + '//' + location.hostname + ':8080/content/' + encodeURIComponent(stem);
+  }
+
+  function action(a) {
+    if (a.command) {
+      return '<div class="act"><span class="lbl">' + esc(a.label) + '</span><code>'
+        + esc(a.command) + '</code><button type="button" class="cp">Copy</button></div>';
+    }
+    if (a.url) {
+      return '<div class="act"><span class="lbl">' + esc(a.label) + '</span><a href="'
+        + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.url) + '</a></div>';
+    }
+    if (a.url === '') {
+      return '<div class="act"><span class="lbl">' + esc(a.label)
+        + '</span><span>the publisher (no address is recorded)</span></div>';
+    }
+    if (a.path) {
+      return '<div class="act"><span class="lbl">' + esc(a.label) + '</span><code>'
+        + esc(a.path) + '</code></div>';
+    }
+    return '';
+  }
+
+  function card(r) {
+    var meta = [KIND[r.kind] || r.kind, LANG[r.lang] || r.lang, size(r.bytes)]
+      .filter(Boolean).join(' · ');
+    var chips = r.topics.map(function (t) {
+      return '<a class="chip" href="#' + esc(t) + '">' + esc(TOPIC[t] || t) + '</a>';
+    }).join('');
+    var lic = r.license ? 'Licence: ' + esc(r.license)
+      + (SHARE[r.redistribute] ? ' · ' + SHARE[r.redistribute] : '') : '';
+    /* A title taken from the description (no Kiwix title for a PDF) would be
+       printed twice; and "searchable and citable" repeats the group heading. */
+    var blurb = r.blurb_en || '';
+    var dup = blurb.replace(/\.$/, '').indexOf(r.title.replace(/\.$/, '')) === 0
+              && blurb.replace(/\.$/, '').length - r.title.length < 4;
+    return '<div class="row ' + r.state + '" id="c-' + esc(r.id) + '">'
+      + '<div class="top"><span class="tw"><i class="dot ' + r.state + '" title="'
+      + WORD[r.state] + '"></i><span class="tt">' + esc(r.title) + '</span></span>'
+      + '<span class="meta">' + esc(meta) + '</span></div>'
+      + (blurb && !dup ? '<p class="blurb">' + esc(blurb) + '</p>' : '')
+      + (r.state !== 'green' ? '<p class="why">' + esc(r.reason) + '</p>' : '')
+      + (r.browse ? '<a class="browse" href="' + esc(browseUrl(r.browse))
+         + '" target="_blank" rel="noopener">Open it in the library ↗</a>' : '')
+      + (chips ? '<div class="chips">' + chips + '</div>' : '')
+      + (lic ? '<p class="lic">' + lic + '</p>' : '')
+      + (r.actions && r.actions.length
+         ? '<div class="acts">' + r.actions.map(action).join('') + '</div>' : '')
+      + '</div>';
+  }
+
+  function match(r) {
+    if (F.topic && r.topics.indexOf(F.topic) < 0) return false;
+    if (F.state && r.state !== F.state) return false;
+    if (F.lang && r.lang !== F.lang) return false;
+    if (F.text) {
+      var hay = (r.title + ' ' + r.id + ' ' + r.blurb_en + ' ' + r.blurb_es + ' '
+                 + r.topics.map(function (t) { return TOPIC[t] || t; }).join(' ')).toLowerCase();
+      var words = F.text.toLowerCase().split(/\s+/).filter(Boolean);
+      for (var i = 0; i < words.length; i++) if (hay.indexOf(words[i]) < 0) return false;
+    }
+    return true;
+  }
+
+  function draw() {
+    if (!DATA) return;
+    var rows = DATA.rows.filter(match);
+    var html = '';
+    ORDER.forEach(function (st) {
+      var mine = rows.filter(function (r) { return r.state === st; })
+        .sort(function (a, b) { return a.title.localeCompare(b.title); });
+      if (!mine.length) return;
+      html += '<div class="group ' + st + '">' + GROUP[st] + ' · ' + mine.length + '</div>'
+        + mine.map(card).join('');
+    });
+    document.getElementById('list').innerHTML = html
+      || '<p class="empty">No collection matches these filters.</p>';
+  }
+
+  function setHash() {
+    var h = F.topic ? '#' + F.topic : ' ';
+    if (history.replaceState) history.replaceState(null, '', h === ' ' ? location.pathname : h);
+  }
+  function fromHash() {
+    var t = decodeURIComponent((location.hash || '').replace(/^#/, ''));
+    F.topic = TOPIC[t] ? t : '';
+    document.getElementById('f-topic').value = F.topic;
+  }
+
+  document.getElementById('f-topic').addEventListener('change', function (e) {
+    F.topic = e.target.value; setHash(); draw();
+  });
+  document.getElementById('f-lang').addEventListener('change', function (e) {
+    F.lang = e.target.value; draw();
+  });
+  document.getElementById('f-text').addEventListener('input', function (e) {
+    F.text = e.target.value.trim(); draw();
+  });
+  document.getElementById('f-state').addEventListener('click', function (e) {
+    var b = e.target.closest('button');
+    if (!b) return;
+    F.state = b.getAttribute('data-s');
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (x) {
+      x.classList.toggle('on', x === b);
+    });
+    draw();
+  });
+  window.addEventListener('hashchange', function () { fromHash(); draw(); });
+
+  /* COPY, WITH A FALLBACK. navigator.clipboard needs a secure context, which
+     the node's own screen is (localhost) and a phone on the LAN is not. There,
+     the command is selected so the reader can copy it by hand. */
+  document.getElementById('list').addEventListener('click', function (e) {
+    var b = e.target.closest('button.cp');
+    if (!b) return;
+    var code = b.previousElementSibling;
+    var text = code.textContent;
+    function selected() {
+      var r = document.createRange(); r.selectNodeContents(code);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      b.textContent = 'Selected';
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { b.textContent = 'Copied'; }, selected);
+    } else {
+      selected();
+    }
+    setTimeout(function () { b.textContent = 'Copy'; }, 2500);
+  });
+
+  function load(refresh) {
+    return fetch('/api/corpus' + (refresh ? '?refresh=1' : ''), { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (c) {
+        if (c.error) throw new Error(c.error);
+        DATA = c;
+        var sel = document.getElementById('f-topic');
+        if (sel.options.length === 1) {
+          (c.topic_list || []).forEach(function (t) {
+            TOPIC[t.id] = t.label_en;
+            var o = document.createElement('option');
+            o.value = t.id; o.textContent = t.label_en;
+            sel.appendChild(o);
+          });
+          fromHash();
+        }
+        legend(c.summary || {});
+        draw();
+        var sm = c.summary || {};
+        document.getElementById('foot').innerHTML = n(sm.total) + ' collections · '
+          + size(sm.bytes_installed) + ' on this drive'
+          + (sm.library_known ? '' : ' · the Kiwix library was not found, so nothing is marked as unserved')
+          + ' · <a href="#" id="refresh">check again now</a>';
+        document.getElementById('refresh').addEventListener('click', function (e) {
+          e.preventDefault(); load(true);
+        });
+      })
+      .catch(function (e) {
+        document.getElementById('list').innerHTML = '<p class="row red">The node did not answer '
+          + '<code>/api/corpus</code>: ' + esc(e.message || e) + '</p>';
+      });
+  }
+  if (S) S.fixHosts();
+  load(false);
+})();
+</script>
+</body>
+</html>

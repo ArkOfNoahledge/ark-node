@@ -191,6 +191,26 @@ footer { border-top:1px solid var(--rule); padding:.5rem 1rem; font-family:var(-
    the archive is finite and an emergency is not - but a paragraph of unverified
    model recall appended to every uncovered question would wear the label out by
    repetition. So the warning stays open and the content folds. */
+/* NOT IN YOUR LIBRARY YET (2026-10-06, PLAN-corpus-status.md). Blue and
+   dashed: it is a direction, not a warning and not a source. It sits after the
+   answer and never inside it, and it never says a collection CONTAINS the
+   answer, only that it may cover the question. */
+.sugg { border:1px dashed var(--day); border-radius:6px; padding:.6rem .8rem; margin:.9rem 0 .2rem; }
+.sugg .lbl { font:600 11px/1.4 var(--mono); letter-spacing:.04em; text-transform:uppercase;
+             color:var(--day); margin-bottom:.3rem; }
+.sugg .lead { font-size:.86rem; color:var(--ink-soft); margin:0 0 .4rem; }
+.sugg .it { border-top:1px solid var(--rule); padding:.45rem 0 .2rem; }
+.sugg .it:first-of-type { border-top:0; }
+.sugg .nm { font-weight:600; }
+.sugg .st { font-family:var(--mono); font-size:.7rem; color:var(--muted); margin-left:.4rem; }
+.sugg .bl { font-size:.84rem; color:var(--ink-soft); }
+.sugg .cmd { display:flex; flex-wrap:wrap; gap:.3rem .5rem; align-items:center; margin:.3rem 0 0;
+             font-size:.78rem; color:var(--muted); }
+.sugg code { font-family:var(--mono); font-size:.74rem; border:1px solid var(--rule);
+             border-radius:3px; padding:.1rem .35rem; overflow-wrap:anywhere; color:var(--ink); }
+.sugg button { font-size:.7rem; padding:.1rem .45rem; }
+.sugg a { color:var(--day); }
+.sugg .more { font-family:var(--mono); font-size:.72rem; margin-top:.4rem; }
 .unsrc { border:1px solid var(--warn); border-left-width:3px; border-radius:4px;
          padding:.55rem .7rem; margin:.6rem 0; }
 .unsrc > summary { cursor:pointer; font-family:var(--mono); font-size:.78rem;
@@ -910,13 +930,71 @@ function wirePlaceChips() {
   applyTiles();
 }
 
+/* THE "NOT IN YOUR LIBRARY YET" CARD. The node sends `suggest` only when the
+   answer was not grounded (or nothing was found), and only collections that
+   are NOT already searchable: something on the drive that is not indexed
+   first, then a repair, then a download. The node never downloads; the card
+   shows the command and the operator runs it. */
+var SG_STATE = { amber: 'on this drive, not indexed', red: 'on this drive, broken',
+                 grey: 'not installed' };
+function suggestCard(sg) {
+  if (!sg || !sg.items || !sg.items.length) { return ''; }
+  var S = window.ARK_SERVICES;
+  var fb = sg.items.length === 1 && sg.items[0].fallback;
+  var h = '<div class="sugg"><div class="lbl">Not in your library yet</div>'
+    + '<p class="lead">' + (fb
+      ? 'Nothing in the catalog matches this question closely. A general encyclopedia may cover it:'
+      : 'The library could not answer this. These collections may cover it:') + '</p>';
+  sg.items.forEach(function (it) {
+    var meta = [];
+    if (it.bytes) { meta.push(it.bytes >= 1e9 ? (it.bytes / 1e9).toFixed(1) + ' GB'
+                                              : Math.max(1, Math.round(it.bytes / 1e6)) + ' MB'); }
+    if (it.license) { meta.push(it.license); }
+    /* a title taken from the description is not printed twice */
+    var bl = it.blurb_en || '', t0 = String(it.title || '').replace(/\.$/, '');
+    var dup = bl.replace(/\.$/, '').indexOf(t0) === 0 && bl.replace(/\.$/, '').length - t0.length < 4;
+    h += '<div class="it"><span class="nm">' + esc(it.title) + '</span>'
+      + '<span class="st">' + esc(SG_STATE[it.state] || it.state) + '</span>'
+      + (bl && !dup ? '<div class="bl">' + esc(bl) + '</div>' : '')
+      + (meta.length ? '<div class="st" style="margin-left:0">' + esc(meta.join(' · ')) + '</div>' : '');
+    if (it.browse && S && S.at && S.ports) {
+      h += '<div class="cmd"><a href="' + esc(S.at(S.ports.archive, '/content/' + encodeURIComponent(it.browse)))
+        + '" target="_blank" rel="noopener">Read it in the library now ↗</a> (not cited by answers until it is indexed)</div>';
+    }
+    (it.actions || []).forEach(function (a) {
+      if (a.command) {
+        h += '<div class="cmd">' + esc(a.label) + ': <code>' + esc(a.command) + '</code>'
+          + '<button type="button" class="sg-cp" data-cmd="' + esc(a.command) + '">Copy</button></div>';
+      } else if (a.url) {
+        h += '<div class="cmd">' + esc(a.label) + ': <a href="' + esc(a.url)
+          + '" target="_blank" rel="noopener">' + esc(a.url) + '</a></div>';
+      } else if (a.path) {
+        h += '<div class="cmd">' + esc(a.label) + ': <code>' + esc(a.path) + '</code></div>';
+      }
+    });
+    h += '</div>';
+  });
+  return h + '<div class="more"><a href="/library/">Every collection, and what each holds →</a></div></div>';
+}
+document.getElementById('answer').addEventListener('click', function (e) {
+  var b = e.target.closest && e.target.closest('button.sg-cp');
+  if (!b) { return; }
+  var cmd = b.getAttribute('data-cmd');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(cmd).then(function () { b.textContent = 'Copied'; },
+                                            function () { select(cmd); b.textContent = 'Copied'; });
+  } else { select(cmd); b.textContent = 'Copied'; }
+  setTimeout(function () { b.textContent = 'Copy'; }, 2500);
+});
+
 function renderAnswer(out) {
   LAST = out;
   var box = document.getElementById('answer');
   document.getElementById('ans-empty').style.display = 'none';
   if (!out.answer) {
     box.innerHTML = '<div class="warn"><b>No answer.</b><br>' +
-      esc(out.model_down || 'The model is not available.') + '</div>';
+      esc(out.model_down || 'The model is not available.') + '</div>' +
+      suggestCard(out.suggest);
     return;
   }
   var a = out.answer, h = '';
@@ -985,6 +1063,7 @@ function renderAnswer(out) {
     h += '<div class="ans">' + chips(a.text, a.cited) + '</div>';
   }
   h += '<div id="xc"></div>';
+  h += suggestCard(out.suggest);
   h += '<div class="tools"><button type="button" id="print">Print this card</button>' +
        (a.reasoning ? ' <button type="button" id="showwork">Show working</button>' : '') +
        '</div>';

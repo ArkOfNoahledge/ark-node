@@ -237,11 +237,63 @@ def slug(fname):
 
 
 def indexed_set():
+    """Where each index artifact lives, relative to the archive root, or None.
+
+    BY PATH, NOT BY NAME, SINCE 2026-10-06. This compared bare names, so the
+    one indexed `02-corpora-core/openstax/` made the three other `openstax/`
+    folders (03, 04, 06) read `indexed: yes` when none of them is in the index.
+    corpus.py's artifact_path() and covers() are the one definition; the node's
+    library page and this column now agree."""
     try:
         d = json.load(open(SOURCES, encoding="utf-8"))
-        return set(v["file"] for v in d["artifacts"].values())
+        return set(_corpus().artifact_path(v) for v in d["artifacts"].values())
     except (OSError, ValueError, KeyError):
         return None
+
+
+def _corpus():
+    """13-ark-node/ark-api/corpus.py: the topic list, what counts as corpus,
+    and how an index artifact maps to a catalog row."""
+    if "corpus" not in sys.modules:
+        sys.path.insert(0, os.path.join(ROOT, "13-ark-node", "ark-api"))
+    import corpus                                           # noqa: E402
+    return corpus
+
+
+def check_topics(out):
+    """topics.csv must name exactly the catalog's corpus rows, with known
+    topics, a language and a yes/no suggest flag. A corpus without a topics row
+    would never be suggested and would draw on no topic tile; a topics row for
+    a corpus that left the catalog would suggest something unfetchable."""
+    c = _corpus()
+    try:
+        top = c.load_csv(c.TOPICS_CSV)
+    except OSError as e:
+        return ["topics.csv unreadable: %s" % e]
+    bad = []
+    corpus_ids = [d["id"] for d in out if c.is_corpus(d)]
+    tids = [t["id"] for t in top]
+    for i in sorted(set(corpus_ids) - set(tids)):
+        bad.append("corpus row with no topics.csv row: %s" % i)
+    for i in sorted(set(tids) - set(corpus_ids)):
+        bad.append("topics.csv row for no corpus in the catalog: %s" % i)
+    for i in sorted(set(x for x in tids if tids.count(x) > 1)):
+        bad.append("topics.csv names %s twice" % i)
+    for t in top:
+        for x in (t.get("topics") or "").split("|"):
+            if x and x not in c.TOPIC_IDS:
+                bad.append("%s: unknown topic %r (the list is in corpus.py)" % (t["id"], x))
+        if not t.get("topics"):
+            bad.append("%s: no topics" % t["id"])
+        if t.get("lang") not in ("en", "es", "mul"):
+            bad.append("%s: lang must be en, es or mul" % t["id"])
+        if t.get("suggest") not in ("yes", "no"):
+            bad.append("%s: suggest must be yes or no" % t["id"])
+        if t.get("suggest") == "yes" and not (t.get("keywords_en") or t.get("keywords_es")):
+            bad.append("%s: suggested but has no keywords" % t["id"])
+        if not t.get("blurb_en"):
+            bad.append("%s: no blurb_en" % t["id"])
+    return bad
 
 
 def load_pins():
@@ -287,10 +339,9 @@ def build():
                 gaps.append("MANIFEST.csv size is wrong for %s: %s recorded, %s on disk"
                             % (fname, size, real))
             size = real
-        first = fname.rstrip("/").split("/")[0]
-        base = fname.rstrip("/").split("/")[-1]
+        rpath = shelf.strip("/") + "/" + fname.strip("/")
         ix = "" if idx is None else (
-            "yes" if (base in idx or first in idx) else "no")
+            "yes" if any(_corpus().covers(a, rpath) for a in idx) else "no")
         page = url.strip().split(" ")[0] if url.strip().startswith("http") else ""
         # A PARTIAL REPOSITORY, 2026-09-30. piper-voices is 3,301 files at its
         # pinned commit and the archive keeps 10: five voices, each an .onnx
@@ -413,10 +464,10 @@ def build():
             gaps.append("follows main, not pinned: %s%s" % (
                 d["id"], (" (%s)" % p["note"]) if p.get("note") else ""))
     if idx is not None:
-        have = set(d["file"].rstrip("/").split("/")[0] for d in out) | \
-            set(d["file"].rstrip("/").split("/")[-1] for d in out)
-        for a in sorted(idx - have):
-            gaps.append("indexed but not in the catalog: %s" % a)
+        paths = [d["shelf"].strip("/") + "/" + d["file"].strip("/") for d in out]
+        for a in sorted(idx):
+            if not any(_corpus().covers(a, p) for p in paths):
+                gaps.append("indexed but not in the catalog: %s" % a)
     starters = set(d["file"] for d in out if d["profile"] == "starter")
     for s in sorted(STARTER - starters):
         gaps.append("starter file missing from the catalog: %s" % s)
@@ -440,6 +491,7 @@ def main():
     a = ap.parse_args()
     out, gaps = build()
     text = render(out)
+    tbad = check_topics(out)
     if a.check:
         cur = open(OUT, encoding="utf-8").read() if os.path.isfile(OUT) else ""
         if cur != text:
@@ -447,6 +499,13 @@ def main():
                   "run python bin/catalog-build.py")
             return 1
         print("catalog.csv matches MANIFEST.csv (%d rows)" % len(out))
+        if tbad:
+            print("topics.csv disagrees with the catalog:")
+            for b in tbad:
+                print("    " + b)
+            return 1
+        print("topics.csv covers the %d corpus rows"
+              % sum(1 for d in out if _corpus().is_corpus(d)))
         return 0
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
@@ -466,6 +525,8 @@ def main():
     print("  licences: %d recorded, %d to verify"
           % (sum(d["license_status"] == "recorded" for d in out),
              sum(d["license_status"] == "to-verify" for d in out)))
+    for b in tbad:
+        print("  topics.csv: " + b)
     print("  %d gap(s)%s" % (len(gaps), "" if a.report or not gaps else
                                " - run with --report to list them"))
     if a.report:
