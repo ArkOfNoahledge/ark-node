@@ -60,6 +60,9 @@ import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 WINDOWS = os.name == "nt"
+# APPLE SILICON, 2026-10-09: the second platform setup builds on. Its GPU has no
+# memory of its own and no nvidia-smi to ask; see GPU_SHARE below.
+MAC = sys.platform == "darwin"
 STATE = os.path.join(tempfile.gettempdir(), "ark-node-run.json")
 
 
@@ -509,6 +512,51 @@ def smallest_need_mib():
     return v + EMBED_HEADROOM_MIB if v else None
 
 
+# A MAC HAS NO CARD: ITS GPU USES THE MACHINE'S OWN MEMORY, 2026-10-09. macOS
+# lets Metal keep only part of it resident. llama.cpp b10566 reported
+# recommendedMaxWorkingSetSize = 12,713 MiB on a 16 GB M1 Pro, 78 percent; 75 is
+# used here so the rule is a little conservative rather than fitted to one
+# machine. A profile fits a Mac when its primary model's footprint on the card,
+# what that model keeps in host memory, and EMBED_HEADROOM_MIB all fit inside
+# that share. There is no "check from system RAM instead" on a Mac: the CPU and
+# the GPU share the same memory, so a second model costs the first one's room,
+# and setup leaves the cross-check off as it does everywhere. Measured on the
+# same M1 Pro: Gemma 4 12B Q4_K_M writes 16.0 tokens a second, Phi-4-mini 46.4.
+GPU_SHARE = 0.75
+
+
+def total_unified_mib():
+    """This Mac's memory in MiB (sysctl hw.memsize); None anywhere else."""
+    if not MAC:
+        return None
+    try:
+        out = subprocess.run(["sysctl", "-n", "hw.memsize"],
+                             capture_output=True, text=True, timeout=10)
+        return int(out.stdout.strip()) // (1024 * 1024)
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def unified_need_mib(pr):
+    """What a profile's primary model needs from a Mac's memory: its card
+    footprint, its host part, and the embedding model's headroom."""
+    p = pr["primary"]
+    return p["vram_mib"] + p["host_mib"] + EMBED_HEADROOM_MIB if p["vram_mib"] else None
+
+
+def pick_profile_unified(total_mib):
+    """The largest profile whose primary model fits GPU_SHARE of a Mac's memory:
+    16 GB gives 12gb, 8 GB gives 8gb, 24 GB gives 16gb, 32 GB gives 24gb."""
+    if total_mib is None:
+        return None
+    best = None
+    for pr in PROFILES:
+        need = unified_need_mib(pr)
+        if need and need <= total_mib * GPU_SHARE:
+            best = pr
+    return best
+
+
 def profile_toml(pr):
     """A complete ark.toml: the models section set to the profile, every other
     setting commented out at its default, as `config --example` writes it."""
@@ -874,6 +922,19 @@ def process_table():
                     ppid = int(r[1]) if r[1].strip().isdigit() else 0
                     table.append((int(r[0]), ppid, r[2] or ""))
             return table or None
+        if MAC:
+            # NO /proc ON macOS. `ps` is always there and prints the same three
+            # columns; the command line is the rest of the line, spaces and all.
+            out = subprocess.run(["ps", "-axo", "pid=,ppid=,command="],
+                                 capture_output=True, text=True, timeout=25)
+            if out.returncode != 0:
+                return None
+            table = []
+            for line in out.stdout.splitlines():
+                parts = line.strip().split(None, 2)
+                if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit():
+                    table.append((int(parts[0]), int(parts[1]), parts[2]))
+            return table or None
         table = []
         for entry in os.listdir("/proc"):
             if not entry.isdigit():
@@ -975,6 +1036,19 @@ def free_ram_mib():
             m.dwLength = ctypes.sizeof(MS)
             ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))
             return int(m.ullAvailPhys // (1024 * 1024))
+        if MAC:
+            # vm_stat counts pages: free, inactive (reclaimable), speculative and
+            # purgeable are what a new process can have without swapping.
+            out = subprocess.run(["vm_stat"], capture_output=True, text=True,
+                                 timeout=10).stdout
+            size = int(re.search(r"page size of (\d+) bytes", out).group(1))
+            pages = 0
+            for k in ("Pages free", "Pages inactive", "Pages speculative",
+                      "Pages purgeable"):
+                m2 = re.search(r"^%s:\s+(\d+)" % k, out, re.M)
+                if m2:
+                    pages += int(m2.group(1))
+            return pages * size // (1024 * 1024)
         with open("/proc/meminfo") as fh:
             for line in fh:
                 if line.startswith("MemAvailable:"):
@@ -2249,7 +2323,9 @@ def do_fetch(args):
             return 2
         rows.append(by_id[i])
     if args.profile:
-        rows += [r for r in cat if args.profile == "full" or r["profile"] == args.profile]
+        rows += [r for r in cat if args.profile == "full" or (
+            r["profile"] == args.profile and (r["kind"] != "software"
+                                              or row_platform(r) in (None, this_platform())))]
     if args.pin:
         return do_pin(args, rows or cat, root, args.catalog or CFG["paths.catalog"])
     if args.lf:
@@ -3486,9 +3562,10 @@ def do_index(args):
 #   fetch     the starter rows of the catalog, and the model the settings name.
 #   binaries  llama.cpp into paths.llama, kiwix-tools beside paths.kiwix_serve,
 #             from the zips just fetched. Nothing already there is overwritten.
-#   venv      paths.venv: torch from PyTorch's CUDA index first, then
+#   venv      paths.venv: torch from PyTorch's CUDA index first (on a Mac, the
+#             same version from PyPI, the build with MPS), then
 #             13-ark-node/requirements/index.txt. Checked by importing the
-#             stack and asking torch whether it sees the GPU.
+#             stack and asking torch whether it sees the GPU (CUDA, or MPS).
 #   build     bin/index-build.py over the starter's ZIM files, on the GPU.
 #   library   bin/kiwix-library.py: library.xml for kiwix-serve.
 #   kiwix     ark.py up archive.
@@ -3513,10 +3590,11 @@ def do_index(args):
 SETUP_STEPS = ["settings", "fetch", "binaries", "venv", "build", "library",
                "kiwix", "books", "index", "node", "ask"]
 SETUP_ABOUT = {
-    "settings": "ark.toml for this card's model profile, cross-check off",
+    "settings": "ark.toml for this machine's model profile, cross-check off",
     "fetch": "the starter rows and the profile's model, checked by sha256",
-    "binaries": "llama.cpp and kiwix-tools, from the zips just fetched",
-    "venv": "the Python environment: CUDA torch, then requirements/index.txt",
+    "binaries": "llama.cpp and kiwix-tools, from the archives just fetched",
+    "venv": "the Python environment: torch (CUDA on Windows, MPS on a Mac), "
+            "then requirements/index.txt",
     "build": "bin/index-build.py over the starter ZIMs (GPU)",
     "index": "python bin/ark.py index",
     "library": "python bin/kiwix-library.py",
@@ -3545,6 +3623,8 @@ try:
     out["torch"] = torch.__version__
     out["cuda"] = bool(torch.cuda.is_available())
     out["gpu"] = torch.cuda.get_device_name(0) if out["cuda"] else ""
+    mps = getattr(torch.backends, "mps", None)
+    out["mps"] = bool(mps is not None and mps.is_available())
 except Exception:
     out["cuda"] = False
 print("ARK-PROBE " + json.dumps(out))
@@ -3566,14 +3646,94 @@ def requirements_torch(path):
     return req, idx
 
 
+def this_platform():
+    return "windows" if WINDOWS else ("macos" if MAC else "linux")
+
+
+_PLATFORM_WORDS = {"win": "windows", "windows": "windows", "macos": "macos",
+                   "darwin": "macos", "linux": "linux"}
+
+
+def row_platform(row):
+    """The platform a software row is built for, from its file name (the release
+    names say it: _win-, -macos-, _Darwin_, _linux-), or None when it says
+    nothing, which means any."""
+    b = os.path.basename(row["file"].rstrip("/")).lower()
+    for w in re.split(r"[-_.]", b):
+        if w in _PLATFORM_WORDS:
+            return _PLATFORM_WORDS[w]
+    return None
+
+
+def _is_archive(b):
+    return b.endswith(".zip") or b.endswith(".tar.gz") or b.endswith(".tgz")
+
+
 def _zip_target(name):
-    """Which folder a starter zip belongs in: 'llama', 'kiwix', or None."""
+    """Which folder a starter archive belongs in: 'llama', 'kiwix', or None.
+    A .zip on Windows, a .tar.gz on macOS."""
     b = os.path.basename(name).lower()
-    if b.endswith(".zip") and ("llama" in b or "cudart" in b):
+    if _is_archive(b) and ("llama" in b or "cudart" in b):
         return "llama"
-    if b.endswith(".zip") and "kiwix-tools" in b:
+    if _is_archive(b) and "kiwix-tools" in b:
         return "kiwix"
     return None
+
+
+def extract_tar(tpath, dest):
+    """A .tar.gz release into dest, the way extract_zip does a zip: nothing
+    overwritten, and a member that would land outside dest refused before
+    anything is written. Returns (written, kept).
+
+    THE macOS RELEASES WRAP EVERYTHING IN ONE TOP FOLDER (llama-b10566/,
+    kiwix-tools_macos-arm64-3.8.2/), and that folder is dropped, so the files
+    land flat where the settings look, as the Windows zips put theirs.
+    Executable bits are kept: a llama-server that is not executable is a
+    download that looks finished and is not. llama.cpp ships its libraries with
+    version links (libggml.dylib -> libggml.0.dylib); a link is made as a link
+    when it points at a name in the same folder, and refused otherwise."""
+    import tarfile
+    dest = os.path.abspath(dest)
+    with tarfile.open(tpath, "r:*") as t:
+        members = [m for m in t.getmembers() if m.isfile() or m.issym() or m.islnk()]
+        split = [(m, [x for x in m.name.replace("\\", "/").split("/") if x not in ("", ".")])
+                 for m in members]
+        tops = set(parts[0] for _m, parts in split if parts)
+        drop = 1 if len(tops) == 1 and all(len(parts) > 1 for _m, parts in split) else 0
+        plan = []
+        for m, parts in split:
+            rel = parts[drop:]
+            bad = (not rel or m.name.startswith("/") or ".." in rel
+                   or (m.issym() and ("/" in m.linkname or "\\" in m.linkname
+                                      or m.linkname in ("", ".", ".."))))
+            tgt = os.path.abspath(os.path.join(dest, *rel)) if rel else dest
+            if bad or not tgt.startswith(dest + os.sep):
+                raise ValueError("%s: member %r would be written outside %s"
+                                 % (os.path.basename(tpath), m.name, dest))
+            plan.append((m, tgt))
+        written, kept = 0, 0
+        for m, tgt in plan:
+            if os.path.lexists(tgt):
+                kept += 1
+                continue
+            os.makedirs(os.path.dirname(tgt), exist_ok=True)
+            if m.issym():
+                os.symlink(m.linkname, tgt)
+            else:
+                src = t.extractfile(m)
+                with open(tgt + ".part", "wb") as out:
+                    shutil.copyfileobj(src, out)
+                os.chmod(tgt + ".part", (m.mode & 0o755) | 0o600)
+                os.replace(tgt + ".part", tgt)
+            written += 1
+    return written, kept
+
+
+def extract_archive(path, dest):
+    """extract_zip or extract_tar, by the file's name."""
+    if path.lower().endswith(".zip"):
+        return extract_zip(path, dest)
+    return extract_tar(path, dest)
 
 
 def extract_zip(zpath, dest):
@@ -3633,7 +3793,7 @@ class Setup:
     def __init__(self, root, cfg, catalog, models=None, windows=WINDOWS,
                  run=None, capture=None, health=None, busy=None, free=None,
                  vram=total_vram_mib, out=print, python=None, environ=None,
-                 sleep=None):
+                 sleep=None, mac=MAC, unified=total_unified_mib):
         self.root, self.cfg, self.cat = root, cfg, catalog
         self.environ = os.environ if environ is None else environ
         self.models_arg, self.windows, self.out = models, windows, out
@@ -3653,6 +3813,9 @@ class Setup:
         # asked the M18's 16 GB card and passed only on machines without one:
         # 113/114 on the M18, 2026-10-02. A number, None, or a function to call.
         self.vram = vram
+        # A MAC IS ASKED FOR ITS MEMORY, NOT FOR A CARD (GPU_SHARE). Same three
+        # forms as vram: a number, None, or a function to call.
+        self.mac, self.unified, self._unified_mib = mac and not windows, unified, None
         self.python = python or sys.executable
         self.sleep = sleep or time.sleep
         self._vram_mib = None
@@ -3703,9 +3866,18 @@ class Setup:
                         % (port(k), k))
         return None
 
+    def platform(self):
+        return "windows" if self.windows else ("macos" if self.mac else "linux")
+
     def profile(self):
-        """The model profile: named, or the largest this card holds. None when
-        there is no NVIDIA card to ask."""
+        """The model profile: named, or the largest this card holds (on a Mac,
+        the largest this machine's memory holds). None when there is nothing to
+        ask."""
+        if not hasattr(self, "_profile") and self.mac:
+            u = self.unified() if callable(self.unified) else self.unified
+            self._unified_mib = u
+            self._profile = (profile(self.models_arg) if self.models_arg
+                             else pick_profile_unified(u))
         if not hasattr(self, "_profile"):
             mib = self.vram() if callable(self.vram) else self.vram
             self._vram_mib = mib
@@ -3736,8 +3908,11 @@ class Setup:
     def rows(self):
         """(rows to fetch, problems). The starter rows less its own model file,
         which is the 16 GB card's; the models come from the settings instead."""
+        # SOFTWARE ROWS ARE PER PLATFORM: the starter carries the Windows zips
+        # and the macOS archives, and each machine fetches its own.
         out = [r for r in self.cat if r["profile"] == "starter" and r["kind"] != "gguf"
-               and (r["kind"] != "software" or self.windows)]
+               and (r["kind"] != "software"
+                    or row_platform(r) in (None, self.platform()))]
         bad = []
         for role, f in sorted(self.model_files().items()):
             r = self.row_for(f)
@@ -3798,6 +3973,24 @@ class Setup:
                 os.path.basename(self.cfg.file), self.cfg["models.primary.name"],
                 "on" if self.cfg["models.crosscheck.enabled"] else "off")
         pr = self.profile()
+        if self.mac:
+            u = self._unified_mib
+            if not pr and u is None:
+                return "blocked", ("could not read this Mac's memory (sysctl hw.memsize). "
+                                   "Name a profile: --models 8gb or 12gb")
+            if not pr:
+                return "blocked", ("this Mac has %s MiB, and the smallest profile (%s, "
+                                   "%s) needs about %s MiB of it. To try anyway: "
+                                   "--models %s" % (format(u, ","), PROFILES[0]["name"],
+                                                    PROFILES[0]["primary"]["name"],
+                                                    format(int(unified_need_mib(PROFILES[0])
+                                                               / GPU_SHARE), ","),
+                                                    PROFILES[0]["name"]))
+            return "due", ("no ark.toml: will write profile %s (%s), cross-check off%s"
+                           % (pr["name"], pr["primary"]["name"],
+                              "; this Mac: %s MiB, about %s for the GPU"
+                              % (format(u, ","), format(int(u * GPU_SHARE), ","))
+                              if u else ""))
         mib = self._vram_mib
         if not pr and mib is None:
             return "blocked", ("no NVIDIA card found: nvidia-smi did not answer. If "
@@ -3836,9 +4029,9 @@ class Setup:
         miss = [k for k, p in b.items() if not os.path.exists(p)]
         if not miss:
             return "current", "llama-server and kiwix-serve in place"
-        if not self.windows:
-            return "blocked", ("the starter's binaries are Windows builds. Put %s at %s "
-                               "yourself (or set its path in ark.toml)"
+        if not self.windows and not self.mac:
+            return "blocked", ("the starter's binaries are Windows and macOS builds. Put "
+                               "%s at %s yourself (or set its path in ark.toml)"
                                % (miss[0], b[miss[0]]))
         return "due", "missing: %s" % ", ".join(miss)
 
@@ -3878,9 +4071,13 @@ class Setup:
         if not pb.get("cuda") and self.windows:
             return "due", ("torch %s does not see an NVIDIA GPU: a CPU build, which "
                            "would embed the index in hours" % pb.get("torch", "?"))
+        if not pb.get("mps") and self.mac:
+            return "due", ("torch %s does not see the Apple GPU (MPS): the index "
+                           "would be embedded on the CPU" % pb.get("torch", "?"))
         return "current", "Python %s, torch %s%s" % (
             pb.get("python", "?"), pb.get("torch", "?"),
-            ", CUDA on %s" % pb["gpu"] if pb.get("cuda") else ", no CUDA")
+            ", CUDA on %s" % pb["gpu"] if pb.get("cuda")
+            else (", MPS (the Apple GPU)" if pb.get("mps") else ", no CUDA"))
 
     def built(self):
         """(built, wanted) scope paths, from sources.json and the files beside it."""
@@ -4020,7 +4217,7 @@ class Setup:
             if not t:
                 continue
             z = fetch_dest(r, self.root)
-            w, k = extract_zip(z, dests[t])
+            w, k = extract_archive(z, dests[t])
             n += 1
             self.out("  %-44s -> %s  (%d written, %d already there)"
                      % (os.path.basename(z), dests[t], w, k))
@@ -4035,8 +4232,13 @@ class Setup:
         if not os.path.exists(vpy):
             cmds.append([self.python, "-m", "venv", self.cfg["paths.venv"]])
         cmds.append([vpy, "-m", "pip", "install", "--upgrade", "pip"])
-        if treq and tidx:
+        # ON A MAC, TORCH COMES FROM PyPI: PyTorch's CUDA index has no macOS
+        # builds, and the PyPI build for Apple silicon is the one with MPS, the
+        # Apple GPU. Same version, so both platforms run what was tested.
+        if treq and tidx and not self.mac:
             cmds.append([vpy, "-m", "pip", "install", treq, "--index-url", tidx])
+        elif treq:
+            cmds.append([vpy, "-m", "pip", "install", treq])
         cmds.append([vpy, "-m", "pip", "install", "-r", idx_req])
         for c in cmds:
             self.out("\n  running  %s\n" % shown(c))
@@ -4616,6 +4818,13 @@ def selftest_profiles(check):
         check("profiles: a 6 GB card gets the smallest profile; 4 GB is too small",
               picks[4][1] == "8gb" and picks[5][1] is None,
               "6144:%s 4096:%s" % (picks[4][1], picks[5][1]))
+        mac = [(g, (pick_profile_unified(g * 1024) or {}).get("name"))
+               for g in (8, 16, 24, 32, 64)]
+        check("profiles: a Mac's memory picks by GPU_SHARE (16 GB is Gemma 12B)",
+              [m[1] for m in mac] == ["8gb", "12gb", "16gb", "24gb", "24gb"]
+              and pick_profile_unified(4 * 1024) is None
+              and pick_profile_unified(None) is None,
+              " ".join("%d:%s" % m for m in mac))
         try:
             cat = dict((r2["id"], r2) for r2 in load_catalog(CFG["paths.catalog"]))
             miss = [(pr["name"], i) for pr in PROFILES for i in pr["fetch"]
@@ -5239,7 +5448,7 @@ def selftest_setup(check):
     calls = []
 
     def mk(**kw):
-        a = dict(windows=True, run=lambda c: calls.append(c) or 0,
+        a = dict(windows=True, mac=False, run=lambda c: calls.append(c) or 0,
                  capture=lambda c: (0, ""), health=lambda p: None,
                  busy=lambda p: False, free=lambda d: 10 ** 15, vram=12282,
                  out=lambda *a: None, python="py", environ=env)
@@ -5266,6 +5475,32 @@ def selftest_setup(check):
           not [r for r in mk(windows=False).rows()[0] if r["kind"] == "software"])
     check("setup: no NVIDIA card and no --models is blocked, by name",
           mk(vram=None).st_settings()[0] == "blocked")
+
+    # A MAC (2026-10-09): no card, memory instead; its own archives, not the zips.
+    mcat = cat + [row("llama-mac", "09-software",
+                      "llamacpp-bin/llama-b1-bin-macos-arm64.tar.gz", "software", "starter"),
+                  row("kiwix-mac", "09-software",
+                      "kiwix-tools/kiwix-tools_macos-arm64-3.8.2.tar.gz", "software", "starter")]
+    Sm = Setup(root, cfg, mcat, windows=False, mac=True, unified=16384, vram=None,
+               run=lambda c: 0, capture=lambda c: (0, ""), health=lambda p: None,
+               busy=lambda p: False, free=lambda d: 10 ** 15, out=lambda *a: None,
+               python="py", environ=env)
+    sm = Sm.st_settings()
+    mids = sorted(r["id"] for r in Sm.rows()[0])
+    check("setup: a 16 GB Mac gets Gemma 4 12B, with no NVIDIA card to ask",
+          sm[0] == "due" and "12gb" in sm[1] and "16,384" in sm[1]
+          and "nvidia" not in sm[1].lower(), sm[1][-44:])
+    check("setup: a Mac fetches the macOS archives, not the Windows zips",
+          {"llama-mac", "kiwix-mac", "gemma12"} <= set(mids)
+          and not {"llama", "cudart", "kiwix"} & set(mids), " ".join(mids))
+    s8 = Setup(root, cfg, mcat, windows=False, mac=True, unified=4096, vram=None,
+               out=lambda *a: None, environ=env).st_settings()
+    check("setup: a Mac too small says so, by its memory",
+          s8[0] == "blocked" and "4,096 MiB" in s8[1], s8[1][:44])
+    check("setup: Linux still has no starter binaries, and says so",
+          not [r for r in Setup(root, cfg, mcat, windows=False, mac=False, vram=None,
+                                out=lambda *a: None, environ=env).rows()[0]
+               if r["kind"] == "software"])
 
     S.do_settings()
     lines = open(os.path.join(root, "ark.toml"), encoding="utf-8").read()
@@ -5332,6 +5567,40 @@ def selftest_setup(check):
             and not os.path.exists(os.path.join(tmp, "outside.dll"))
     check("setup: a zip member that escapes its folder is refused, nothing written", ok)
 
+    import tarfile
+    import io as _io
+
+    def tarit(rel, members, top="llama-b1"):
+        pth = os.path.join(tmp, *rel.split("/"))
+        os.makedirs(os.path.dirname(pth), exist_ok=True)
+        with tarfile.open(pth, "w:gz") as tf:
+            for n, d in members.items():
+                ti = tarfile.TarInfo((top + "/" if top else "") + n)
+                if isinstance(d, tuple):
+                    ti.type, ti.linkname = tarfile.SYMTYPE, d[0]
+                    tf.addfile(ti)
+                else:
+                    ti.size, ti.mode = len(d), 0o755
+                    tf.addfile(ti, _io.BytesIO(d))
+        return pth
+    tg = tarit("mac/llama.tar.gz", {"llama-server": b"L", "libggml.0.1.dylib": b"G",
+                                    "libggml.dylib": ("libggml.0.1.dylib",)})
+    md = os.path.join(tmp, "mac-llama")
+    wk = extract_archive(tg, md)
+    ls = os.path.join(md, "llama-server")
+    check("setup: a macOS archive lands flat, executable, with its library links",
+          wk == (3, 0) and os.path.isfile(ls) and (os.name == "nt" or os.access(ls, os.X_OK))
+          and (os.name == "nt" or os.readlink(os.path.join(md, "libggml.dylib"))
+               == "libggml.0.1.dylib")
+          and extract_archive(tg, md) == (0, 3), str(wk))
+    te = tarit("mac/evil.tar.gz", {"ok": b"y", "bad": ("../../etc/passwd",)})
+    try:
+        extract_archive(te, os.path.join(tmp, "mac-evil"))
+        ok = False
+    except ValueError:
+        ok = not os.path.exists(os.path.join(tmp, "mac-evil", "ok"))
+    check("setup: a link out of its folder is refused, nothing written", ok)
+
     os.makedirs(os.path.join(root, "13-ark-node", "requirements"))
     with open(os.path.join(root, "13-ark-node", "requirements", "node.txt"), "w") as fh:
         fh.write("# torch-index: https://example.invalid/cu128\ntorch==9.9.0\nnumpy==1\n")
@@ -5342,6 +5611,14 @@ def selftest_setup(check):
           and calls[2][-3:] == ["torch==9.9.0", "--index-url", "https://example.invalid/cu128"]
           and calls[3][-2] == "-r" and calls[3][-1].endswith("index.txt")
           and all(c[0] == vpy for c in calls[1:]), "%d commands" % len(calls))
+    mcalls = []
+    Smv = Setup(root, S.cfg, cat, windows=False, mac=True, unified=16384, vram=None,
+                run=lambda c: mcalls.append(c) or 0, out=lambda *a: None,
+                python="py", environ=env)
+    Smv.do_venv()
+    check("setup: on a Mac, torch comes from PyPI (MPS), not the CUDA index",
+          any(c[-1] == "torch==9.9.0" for c in mcalls)
+          and not any("--index-url" in c for c in mcalls), "%d commands" % len(mcalls))
     put(os.path.relpath(vpy, root).replace(os.sep, "/"), b"")
     probe = {"missing": [], "python": "3.12.9", "torch": "2.11.0+cpu", "cuda": False}
     Sv = mk(cfg=S.cfg, capture=lambda c: (0, "ARK-PROBE " + json.dumps(probe)))

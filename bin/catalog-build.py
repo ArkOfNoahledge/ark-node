@@ -92,13 +92,20 @@ STARTER = {
     "llamacpp-bin/llama-b10566-bin-win-cuda-12.4-x64.zip",
     "llamacpp-bin/cudart-llama-bin-win-cuda-12.4-x64.zip",
     "kiwix-tools/kiwix-tools_win-x86_64-3.8.1.zip",
+    # macOS, Apple silicon (2026-10-09): `setup` fetches the software rows of
+    # the platform it runs on, so the starter carries both and each machine
+    # takes its own (ark.py row_platform).
+    "llamacpp-bin/llama-b10566-bin-macos-arm64.tar.gz",
+    "kiwix-tools/kiwix-tools_macos-arm64-3.8.2.tar.gz",
 }
 
-# Files the node needs on Windows that MANIFEST.csv records only as part of a
-# folder row. Taken from the shelf's CHECKSUMS.sha256 at build time.
+# Files the node needs on Windows or macOS that MANIFEST.csv records only as
+# part of a folder row. Taken from the shelf's CHECKSUMS.sha256 at build time.
 EXTRA = [
     ("09-software", "kiwix-tools/kiwix-tools_win-x86_64-3.8.1.zip",
      "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_win-x86_64-3.8.1.zip"),
+    ("09-software", "kiwix-tools/kiwix-tools_macos-arm64-3.8.2.tar.gz",
+     "https://download.kiwix.org/release/kiwix-tools/kiwix-tools_macos-arm64-3.8.2.tar.gz"),
     ("09-software", "go-pmtiles_1.31.2_Windows_x86_64.zip",
      "https://github.com/protomaps/go-pmtiles/releases/download/v1.31.2/"
      "go-pmtiles_1.31.2_Windows_x86_64.zip"),

@@ -16,6 +16,10 @@
 # One index for both passes is how a CPU torch, or a generic package from the
 # wrong index, arrives without anyone being told.
 #
+# ON A MAC (Apple silicon) setup installs the same torch version from PyPI
+# instead: PyTorch's CUDA index has no macOS builds, and PyPI's is the one that
+# uses the Apple GPU (MPS). By hand: python -m pip install torch==2.11.0
+#
 # The versions are the ones the reference node (16 GB card, Python 3.12) has run
 # since 2026-08-30. Newer ones may work; these are the ones that were tested.
 #
